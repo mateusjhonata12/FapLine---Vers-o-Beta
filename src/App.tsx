@@ -34,6 +34,9 @@ import {
   Rewind,
   FastForward,
   RotateCcw,
+  RotateCw,
+  Pause,
+  Maximize,
   ArrowBigLeft,
   ArrowBigRight
 } from 'lucide-react';
@@ -1811,21 +1814,43 @@ const MediaModal: React.FC<{
   const [isPlaying, setIsPlaying] = useState(true);
 
   useEffect(() => {
-    // Inteligência para selecionar a aba inicial baseada no conteúdo disponível
-    if (course) {
-      const hasVideo = course.videoUrl && course.videoUrl !== "" && !course.videoUrl.startsWith('file://');
-      const hasPdf = course.pdfUrl && course.pdfUrl !== "" && !course.pdfUrl.startsWith('file://');
-
-      if (type === 'video' && !hasVideo && hasPdf) {
-        setCurrentTab('pdf');
-      } else if (type === 'pdf' && !hasPdf && hasVideo) {
-        setCurrentTab('video');
-      } else {
-        setCurrentTab(type || (hasVideo ? 'video' : (hasPdf ? 'pdf' : 'video')));
-      }
+    if (isOpen && course) {
+      // Pequeno timeout para garantir que o DOM foi renderizado antes de tentar o scroll
+      const timer = setTimeout(() => {
+        const sectionId = type === 'pdf' ? 'pdf-section' : 'video-section';
+        const element = document.getElementById(sectionId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'auto', block: 'start' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
-    setIsPlaying(true);
-  }, [type, course]);
+  }, [isOpen, type, course]);
+
+  if (!course) return null;
+
+  const isVideoBlob = course.videoUrl?.startsWith('blob:');
+  const isPdfBlob = course.pdfUrl?.startsWith('blob:');
+
+  // Detecção robusta para links diretos (Vercel, MP4, etc)
+  const isDirectVideo = (url: string) => {
+    return url.startsWith('blob:') || 
+           url.includes('.mp4') || 
+           url.includes('.webm') || 
+           url.includes('.ogg') || 
+           url.includes('vercel.app') || 
+           url.includes('firebasestorage.googleapis.com');
+  };
+
+  const videoSrc = course.videoUrl && course.videoUrl !== "" && !course.videoUrl.startsWith('file://')
+    ? (course.videoUrl.includes('youtube.com') || course.videoUrl.includes('youtu.be')
+        ? course.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')
+        : course.videoUrl)
+    : null;
+    
+  const pdfSrc = course.pdfUrl && !course.pdfUrl.startsWith('file://') 
+    ? course.pdfUrl 
+    : null;
 
   const handleTimeUpdate = () => {
     if (videoRef.current) {
@@ -1864,23 +1889,6 @@ const MediaModal: React.FC<{
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
-
-  if (!course) return null;
-
-  const isVideoBlob = course.videoUrl?.startsWith('blob:');
-  const isPdfBlob = course.pdfUrl?.startsWith('blob:');
-
-  const videoSrc = isVideoBlob 
-    ? course.videoUrl 
-    : (course.videoUrl && course.videoUrl !== "" && !course.videoUrl.startsWith('file://') 
-        ? (course.videoUrl.includes('youtube.com') || course.videoUrl.includes('youtu.be')
-            ? course.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')
-            : course.videoUrl)
-        : null);
-    
-  const pdfSrc = course.pdfUrl && !course.pdfUrl.startsWith('file://') 
-    ? course.pdfUrl 
-    : null;
 
   const handleSeek = (offset: number) => {
     if (videoRef.current) {
@@ -1950,24 +1958,48 @@ const MediaModal: React.FC<{
                     {videoSrc && (
                       <div id="video-section" className="bg-slate-900 w-full">
                         <div className="max-w-6xl mx-auto w-full aspect-video relative group flex items-center justify-center">
-                          {videoSrc.startsWith('blob:') || !videoSrc.includes('youtube.com') ? (
+                          {isDirectVideo(videoSrc) ? (
                             <>
                               <video 
                                 key={videoSrc}
                                 ref={videoRef}
                                 src={videoSrc} 
-                                className="w-full h-full object-contain" 
+                                className="w-full h-full object-contain cursor-pointer" 
                                 controls={false}
                                 autoPlay 
+                                playsInline
                                 onTimeUpdate={handleTimeUpdate}
                                 onLoadedMetadata={handleLoadedMetadata}
+                                onPlay={() => setIsPlaying(true)}
+                                onPause={() => setIsPlaying(false)}
+                                onClick={handlePlayPause}
                               />
+                              
+                              {/* Central Play/Pause Hint */}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <AnimatePresence>
+                                  {!isPlaying && (
+                                    <motion.div 
+                                      initial={{ scale: 0.8, opacity: 0 }}
+                                      animate={{ scale: 1, opacity: 1 }}
+                                      exit={{ scale: 1.2, opacity: 0 }}
+                                      className="w-20 h-20 bg-blue-600/80 text-white rounded-full flex items-center justify-center shadow-2xl backdrop-blur-sm"
+                                    >
+                                      <Play size={40} fill="currentColor" className="ml-1" />
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+
                               {/* Custom Controls Overlay */}
-                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 sm:p-6 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-4 sm:p-8 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
                                 {/* Progress Bar */}
-                                <div className="mb-4 flex items-center gap-3">
-                                  <span className="text-[10px] sm:text-xs font-mono text-white/80 min-w-[35px]">{formatTime(currentTime)}</span>
-                                  <div className="relative flex-1 group/progress h-6 flex items-center">
+                                <div className="mb-6 group/timeline relative">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] sm:text-xs font-mono text-white/70">{formatTime(currentTime)}</span>
+                                    <span className="text-[10px] sm:text-xs font-mono text-white/70">{formatTime(duration)}</span>
+                                  </div>
+                                  <div className="relative h-1.5 sm:h-2 bg-white/10 rounded-full overflow-hidden cursor-pointer">
                                     <input 
                                       type="range"
                                       min="0"
@@ -1975,52 +2007,59 @@ const MediaModal: React.FC<{
                                       step="0.1"
                                       value={currentTime}
                                       onChange={handleSeekChange}
-                                      className="absolute inset-0 w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-[#3B82F6] hover:h-1.5 transition-all"
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                     />
                                     <div 
-                                      className="h-1 bg-[#3B82F6] rounded-full pointer-events-none transition-all group-hover/progress:h-1.5"
+                                      className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-100"
                                       style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
                                     />
+                                    <div 
+                                      className="absolute top-0 h-full w-1 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] transition-all duration-100"
+                                      style={{ left: `${(currentTime / (duration || 1)) * 100}%` }}
+                                    />
                                   </div>
-                                  <span className="text-[10px] sm:text-xs font-mono text-white/80 min-w-[35px]">{formatTime(duration)}</span>
                                 </div>
 
                                 <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2 sm:gap-4">
+                                  <div className="flex items-center gap-3 sm:gap-6">
                                     <button 
                                       onClick={handlePlayPause}
-                                      className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
+                                      className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-all text-white backdrop-blur-md"
                                     >
                                       {isPlaying ? (
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                                        <Pause size={24} fill="currentColor" />
                                       ) : (
-                                        <Play size={22} fill="currentColor" />
+                                        <Play size={24} fill="currentColor" className="ml-1" />
                                       )}
                                     </button>
 
-                                    <button 
-                                      onClick={() => handleSeek(-10)}
-                                      className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
-                                      title="Voltar 10s"
-                                    >
-                                      <Rewind size={20} />
-                                    </button>
-                                    
-                                    <button 
-                                      onClick={() => handleSeek(10)}
-                                      className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
-                                      title="Avançar 10s"
-                                    >
-                                      <FastForward size={20} />
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                      <button 
+                                        onClick={() => handleSeek(-10)}
+                                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white"
+                                        title="Voltar 10s"
+                                      >
+                                        <RotateCcw size={20} />
+                                      </button>
+                                      
+                                      <button 
+                                        onClick={() => handleSeek(10)}
+                                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white"
+                                        title="Avançar 10s"
+                                      >
+                                        <RotateCw size={20} />
+                                      </button>
+                                    </div>
 
-                                    <div className="hidden sm:flex items-center gap-1 ml-2">
-                                      {[1, 1.5, 2].map(rate => (
+                                    <div className="hidden sm:flex items-center gap-1.5 ml-4 p-1 bg-white/5 rounded-xl border border-white/10">
+                                      {[1, 1.25, 1.5, 2].map(rate => (
                                         <button
                                           key={rate}
                                           onClick={() => handleRateChange(rate)}
-                                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                                            playbackRate === rate ? 'bg-[#3B82F6] text-white' : 'text-white/60 hover:text-white hover:bg-white/10'
+                                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                                            playbackRate === rate 
+                                              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
+                                              : 'text-white/40 hover:text-white hover:bg-white/10'
                                           }`}
                                         >
                                           {rate}x
@@ -2029,14 +2068,28 @@ const MediaModal: React.FC<{
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-4">
+                                    <button 
+                                      onClick={() => {
+                                        if (videoRef.current) {
+                                          if (videoRef.current.requestFullscreen) {
+                                            videoRef.current.requestFullscreen();
+                                          }
+                                        }
+                                      }}
+                                      className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/80 hover:text-white"
+                                      title="Tela Cheia"
+                                    >
+                                      <Maximize size={20} />
+                                    </button>
                                     <a 
                                       href={videoSrc || '#'}
                                       download={`${course.title}.mp4`}
-                                      className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"
+                                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-blue-600/20"
                                       title="Baixar Vídeo"
                                     >
-                                      <Download size={20} />
+                                      <Download size={16} />
+                                      <span className="hidden sm:inline">Baixar</span>
                                     </a>
                                   </div>
                                 </div>
