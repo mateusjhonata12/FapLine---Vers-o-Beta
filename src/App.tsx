@@ -64,6 +64,7 @@ import {
   where
 } from 'firebase/firestore';
 import { db, auth, storage, handleFirestoreError, OperationType } from './lib/firebase';
+import { saveLocalFile, getLocalFile } from './lib/indexedDB';
 
 // --- Tipos ---
 interface Course {
@@ -75,6 +76,7 @@ interface Course {
   thumbnail: string;
   videoUrl?: string;
   pdfUrl?: string;
+  createdAt?: number;
 }
 
 interface SidebarItemProps {
@@ -355,15 +357,57 @@ export default function App() {
   useEffect(() => {
     // Cursos (Sempre visíveis publicamente agora)
     const coursesUnsubscribe = onSnapshot(collection(db, 'courses'), 
-      (snapshot) => {
+      async (snapshot) => {
         const coursesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
-        setCourses(coursesData);
+        
+        // Resolve local file URLs from IndexedDB if they are local keys
+        const updatedCourses = await Promise.all(coursesData.map(async (course) => {
+          const updatedCourse = { ...course };
+          if (course.videoUrl && course.videoUrl.startsWith('local-file-')) {
+            try {
+              const blob = await getLocalFile(course.videoUrl);
+              if (blob) {
+                updatedCourse.videoUrl = URL.createObjectURL(blob);
+              }
+            } catch (err) {
+              console.error("Erro ao carregar arquivo de vídeo local:", err);
+            }
+          }
+          if (course.pdfUrl && course.pdfUrl.startsWith('local-file-')) {
+            try {
+              const blob = await getLocalFile(course.pdfUrl);
+              if (blob) {
+                updatedCourse.pdfUrl = URL.createObjectURL(blob);
+              }
+            } catch (err) {
+              console.error("Erro ao carregar material PDF local:", err);
+            }
+          }
+          return updatedCourse;
+        }));
+
+        // Sort: items with createdAt descending, then items without by numeric ID ascending
+        updatedCourses.sort((a, b) => {
+          const aTime = a.createdAt || 0;
+          const bTime = b.createdAt || 0;
+          if (aTime || bTime) {
+            return bTime - aTime;
+          }
+          const aId = parseInt(a.id) || 999;
+          const bId = parseInt(b.id) || 999;
+          return aId - bId;
+        });
+
+        setCourses(updatedCourses);
         setIsAppLoading(false);
 
         if (snapshot.empty) {
           COURSES.forEach(async (c) => {
             const { id, ...data } = c;
-            await setDoc(doc(db, 'courses', id), data);
+            await setDoc(doc(db, 'courses', id), {
+              ...data,
+              createdAt: Date.now() - (30 - (parseInt(id) || 0)) * 60000
+            });
           });
         }
       },
@@ -704,7 +748,10 @@ export default function App() {
                   setIsAppLoading(true);
                   try {
                     const { id, ...data } = course;
-                    await addDoc(collection(db, 'courses'), data);
+                    await addDoc(collection(db, 'courses'), {
+                      ...data,
+                      createdAt: Date.now()
+                    });
                   } catch (e) {
                     console.error("Erro ao adicionar curso:", e);
                   } finally {
@@ -1158,19 +1205,30 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, isCompleted, onToggleCo
               isCompleted 
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
                 : 'bg-[#3B82F6] text-white hover:bg-[#2563EB]'
-            }`}
+            } ${!course.pdfUrl ? 'w-full' : ''}`}
           >
             <Play size={18} />
             {isCompleted ? 'Reassistir' : 'Iniciar Aula'}
           </button>
-          <button 
-            onClick={() => onOpenMedia('pdf')}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-100 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-200 transition-colors active:scale-95 shadow-sm"
-            title="Ver Material de Apoio"
-          >
-            <FileText size={18} />
-            <span className="sm:hidden lg:inline">Material</span>
-          </button>
+          {course.pdfUrl ? (
+            <button 
+              onClick={() => onOpenMedia('pdf')}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 py-3 text-sm font-semibold text-emerald-700 transition-colors active:scale-95 shadow-sm"
+              title="Ver e Baixar Material de Apoio (PDF)"
+            >
+              <FileText size={18} className="text-emerald-600" />
+              <span>Material</span>
+            </button>
+          ) : (
+            <button 
+              disabled
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-50 border border-slate-100 py-3 text-sm font-semibold text-slate-300 cursor-not-allowed"
+              title="Sem material de apoio disponível"
+            >
+              <FileText size={18} />
+              <span>Sem PDF</span>
+            </button>
+          )}
         </div>
       </div>
     </motion.div>
@@ -1332,20 +1390,37 @@ const AdminView: React.FC<{
 
   const handleFileUpload = async (file: File, type: 'video' | 'pdf') => {
     setIsUploading(true);
+    
+    // 1. Salva localmente no IndexedDB e atualiza o estado imediatamente para uso instantâneo offline/local
+    const localId = `local-file-${Date.now()}-${file.name}`;
+    try {
+      await saveLocalFile(localId, file);
+      
+      if (type === 'video') {
+        setNewCourse(prev => ({ ...prev, videoUrl: localId }));
+      } else {
+        setNewCourse(prev => ({ ...prev, pdfUrl: localId }));
+      }
+    } catch (e) {
+      console.warn("Erro ao salvar localmente no IndexedDB:", e);
+    }
+
+    // 2. Tenta fazer o upload em segundo plano para o Firebase Storage
     try {
       const storageRef = ref(storage, `courses/${type}s/${Date.now()}_${file.name}`);
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
+      // Sincroniza com a URL na nuvem se o upload deu certo
       if (type === 'video') {
         setNewCourse(prev => ({ ...prev, videoUrl: downloadURL }));
       } else {
         setNewCourse(prev => ({ ...prev, pdfUrl: downloadURL }));
       }
-      alert(`${type.toUpperCase()} enviado com sucesso!`);
+      alert(`${type.toUpperCase()} enviado e hospedado com sucesso na nuvem!`);
     } catch (error) {
-      console.error("Erro no upload:", error);
-      alert("Erro ao enviar arquivo. Verifique sua conexão e permissões.");
+      console.warn("Firebase Storage indisponível, utilizando cópia local do IndexedDB:", error);
+      alert(`${type.toUpperCase()} carregado localmente com sucesso no navegador!`);
     } finally {
       setIsUploading(false);
     }
