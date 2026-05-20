@@ -1,5 +1,6 @@
 {
   "name": "Remix: FapAcademy",
   "description": "Plataforma de treinamento interno (LXP) para os sistemas 7Edu e TOTVS.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -41,6 +41,7 @@ import {
   ArrowBigRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { AIAssistant } from './components/AIAssistant';
 import { 
   signInAnonymously,
   onAuthStateChanged
@@ -916,8 +917,22 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
-        </motion.div>
-      )}
+
+      {/* AI Assistant Chatbot with tool and voice capabilities */}
+      <AIAssistant 
+        courses={courses} 
+        onOpenCourse={(course, type) => {
+          setSelectedCourse(course);
+          setModalType(type);
+          setTimeout(() => {
+            if ((window as any).__mediaModalSetTab) {
+              (window as any).__mediaModalSetTab(type);
+            }
+          }, 50);
+        }} 
+      />
+    </motion.div>
+  )}
       
       {/* Global Loading Overlay */}
       <AnimatePresence>
@@ -1870,7 +1885,7 @@ const AdminView: React.FC<{
       </AnimatePresence>
     </motion.div>
   );
-}
+};
 
 const MediaModal: React.FC<{ 
   isOpen: boolean, 
@@ -1883,24 +1898,39 @@ const MediaModal: React.FC<{
 }> = ({ isOpen, type, course, onClose, onPrev, onNext, onTypeChange }) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const [playbackRate, setPlaybackRate] = React.useState(1);
-  const [currentTab, setCurrentTab] = useState<'video' | 'pdf'>(type || 'video');
+  const [currentTab, setCurrentTab] = useState<'video' | 'pdf'>('video');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
 
   useEffect(() => {
-    if (isOpen && course) {
-      // Pequeno timeout para garantir que o DOM foi renderizado antes de tentar o scroll
-      const timer = setTimeout(() => {
-        const sectionId = type === 'pdf' ? 'pdf-section' : 'video-section';
-        const element = document.getElementById(sectionId);
-        if (element) {
-          element.scrollIntoView({ behavior: 'auto', block: 'start' });
-        }
-      }, 100);
-      return () => clearTimeout(timer);
+    if (isOpen && type) {
+      setCurrentTab(type);
     }
   }, [isOpen, type, course]);
+
+  // Expose tab setter and video controls to window for AI Assistant automation
+  useEffect(() => {
+    if (isOpen) {
+      (window as any).__mediaModalSetTab = setCurrentTab;
+    } else {
+      (window as any).__mediaModalSetTab = null;
+    }
+    return () => {
+      (window as any).__mediaModalSetTab = null;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && videoRef.current) {
+      (window as any).__videoPlayer = videoRef.current;
+    } else {
+      (window as any).__videoPlayer = null;
+    }
+    return () => {
+      (window as any).__videoPlayer = null;
+    };
+  }, [isOpen, currentTab, course]);
 
   if (!course) return null;
 
@@ -1999,7 +2029,7 @@ const MediaModal: React.FC<{
                     <span className="text-[10px] text-[#3B82F6] font-bold uppercase tracking-wider">{course.system}</span>
                     <span className="text-slate-300">•</span>
                     <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                      Aula Completa
+                      {currentTab === 'pdf' ? 'Material de Apoio' : 'Vídeo Aula'}
                     </p>
                   </div>
                 </div>
@@ -2016,9 +2046,36 @@ const MediaModal: React.FC<{
               </div>
             </div>
 
+            {/* Selector de Abas se ambos existirem */}
+            {videoSrc && pdfSrc && (
+              <div className="flex border-b border-slate-100 bg-slate-50/50 p-1.5 gap-2">
+                <button
+                  onClick={() => setCurrentTab('video')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl transition-all ${
+                    currentTab === 'video'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  }`}
+                >
+                  <Play size={16} />
+                  Vídeo Aula
+                </button>
+                <button
+                  onClick={() => setCurrentTab('pdf')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl transition-all ${
+                    currentTab === 'pdf'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  }`}
+                >
+                  <FileText size={16} />
+                  Material de Apoio (PDF)
+                </button>
+              </div>
+            )}
+
             <div className="flex-1 bg-white overflow-hidden relative flex flex-col h-full">
               <div className="flex-1 overflow-y-auto scroll-smooth">
-                {/* Unified Content View */}
                 {!videoSrc && !pdfSrc ? (
                   <div className="flex flex-col items-center justify-center p-12 sm:p-20 text-center">
                     <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-6">
@@ -2029,10 +2086,10 @@ const MediaModal: React.FC<{
                   </div>
                 ) : (
                   <div className="flex flex-col">
-                    {/* Video Section */}
-                    {videoSrc && (
-                      <div id="video-section" className="bg-slate-900 w-full">
-                        <div className="max-w-6xl mx-auto w-full aspect-video relative group flex items-center justify-center">
+                    {/* Vídeo Aula - Visível apenas quando tab === 'video' */}
+                    {videoSrc && currentTab === 'video' && (
+                      <div className="bg-slate-900 w-full">
+                        <div className="max-w-6xl mx-auto w-full aspect-video relative group flex items-center justify-center bg-black">
                           {isDirectVideo(videoSrc) ? (
                             <>
                               <video 
@@ -2183,9 +2240,9 @@ const MediaModal: React.FC<{
                       </div>
                     )}
 
-                    {/* PDF / Material Section */}
-                    {pdfSrc && (
-                      <div id="pdf-section" className="p-6 sm:p-12 bg-slate-50 border-t border-slate-200">
+                    {/* Material de Apoio (PDF) - Visível apenas quando tab === 'pdf' */}
+                    {pdfSrc && currentTab === 'pdf' && (
+                      <div className="p-6 sm:p-12 bg-slate-50">
                         <div className="max-w-4xl mx-auto">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
                             <div className="flex items-center gap-4">
@@ -2222,7 +2279,7 @@ const MediaModal: React.FC<{
               </div>
             </div>
 
-          <div className="p-4 sm:p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
+            <div className="p-4 sm:p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <button 
                   onClick={onPrev}
@@ -2262,24 +2319,22 @@ const MediaModal: React.FC<{
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto">
-                {videoSrc && (
+                {currentTab === 'video' && pdfSrc && (
                   <button 
-                    onClick={() => {
-                      document.getElementById('video-section')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="flex-1 sm:flex-none px-4 py-3 rounded-xl font-bold transition-all border border-blue-100 text-[#3B82F6] hover:bg-blue-50 text-xs"
+                    onClick={() => setCurrentTab('pdf')}
+                    className="flex-1 sm:flex-none px-4 py-3 rounded-xl font-bold transition-all border border-emerald-100 text-emerald-600 hover:bg-emerald-50 text-xs flex items-center gap-2"
                   >
-                    Ver Vídeo
+                    <FileText size={14} />
+                    Ver Material PDF
                   </button>
                 )}
-                {pdfSrc && (
+                {currentTab === 'pdf' && videoSrc && (
                   <button 
-                    onClick={() => {
-                      document.getElementById('pdf-section')?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="flex-1 sm:flex-none px-4 py-3 rounded-xl font-bold transition-all border border-emerald-100 text-emerald-600 hover:bg-emerald-50 text-xs"
+                    onClick={() => setCurrentTab('video')}
+                    className="flex-1 sm:flex-none px-4 py-3 rounded-xl font-bold transition-all border border-blue-100 text-[#3B82F6] hover:bg-blue-50 text-xs flex items-center gap-2"
                   >
-                    Ver Material
+                    <Play size={14} />
+                    Assistir Vídeo Aula
                   </button>
                 )}
               </div>
@@ -2289,4 +2344,4 @@ const MediaModal: React.FC<{
       )}
     </AnimatePresence>
   );
-}
+};
