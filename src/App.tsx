@@ -38,7 +38,12 @@ import {
   Pause,
   Maximize,
   ArrowBigLeft,
-  ArrowBigRight
+  ArrowBigRight,
+  ExternalLink,
+  VolumeX,
+  Volume1,
+  Volume2,
+  FileCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AIAssistant } from './components/AIAssistant';
@@ -78,6 +83,7 @@ interface Course {
   videoUrl?: string;
   pdfUrl?: string;
   createdAt?: number;
+  description?: string;
 }
 
 interface SidebarItemProps {
@@ -1201,6 +1207,10 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, isCompleted, onToggleCo
           </button>
         </div>
         
+        <p className="text-slate-500 text-xs line-clamp-2 leading-relaxed mb-4">
+          {course.description || "Esta aula aborda as diretrizes essenciais, instruções e melhores práticas recomendadas para o domínio operacional dos processos administrativos."}
+        </p>
+        
         <div className="mt-auto flex items-center gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-1">
             <Clock size={14} />
@@ -1398,7 +1408,7 @@ const AdminView: React.FC<{
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'user' as const });
   const [newCourse, setNewCourse] = useState<Omit<Course, 'id'>>({ 
-    title: '', system: '7Edu', duration: '', difficulty: 'Iniciante', thumbnail: '', videoUrl: '', pdfUrl: '' 
+    title: '', system: '7Edu', duration: '', difficulty: 'Iniciante', thumbnail: '', videoUrl: '', pdfUrl: '', description: '' 
   });
   const [bulkText, setBulkText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -1455,17 +1465,61 @@ const AdminView: React.FC<{
     }
   };
 
+  const isValidVideoUrl = (urlStr: string) => {
+    if (!urlStr) return false;
+    const trimmed = urlStr.trim().toLowerCase();
+    
+    if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) return true;
+    if (trimmed.includes('sharepoint.com')) return true;
+    if (trimmed.includes('onedrive.live.com') || trimmed.includes('1drv.ms')) return true;
+    if (trimmed.includes('vimeo.com')) return true;
+    if (trimmed.includes('drive.google.com')) return true;
+    if (trimmed.startsWith('blob:')) return true;
+    
+    if (trimmed.endsWith('.mp4') || trimmed.endsWith('.webm') || trimmed.endsWith('.ogg') || trimmed.endsWith('.mov') || trimmed.endsWith('.m3u8')) return true;
+    if (trimmed.includes('firebasestorage.googleapis.com')) return true;
+    
+    try {
+      const parsed = new URL(urlStr);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (_) {
+      return false;
+    }
+  };
+
   const handleSubmitCourse = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newCourse.title) {
+    if (!newCourse.title) {
+      alert("Por favor, preencha o título da aula.");
+      return;
+    }
+    if (!newCourse.description) {
+      alert("Por favor, preencha a descrição da aula.");
+      return;
+    }
+    if (newCourse.videoUrl) {
+      if (!isValidVideoUrl(newCourse.videoUrl)) {
+        alert("URL do vídeo inválida! A URL deve ser um link válido do SharePoint, OneDrive, YouTube, Vimeo, Google Drive ou arquivo MP4 direto.");
+        return;
+      }
+    } else {
+      alert("Por favor, preencha a URL do vídeo.");
+      return;
+    }
+
+    try {
       if (editingCourse) {
         onUpdateCourse({ ...editingCourse, ...newCourse });
+        alert("Vídeo-aula atualizada com sucesso!");
       } else {
         onAddCourse({ id: Math.random().toString(36).substr(2, 9), ...newCourse });
+        alert("Vídeo-aula cadastrada com sucesso!");
       }
-      setNewCourse({ title: '', system: '7Edu', duration: '', difficulty: 'Iniciante', thumbnail: '', videoUrl: '', pdfUrl: '' });
+      setNewCourse({ title: '', system: '7Edu', duration: '', difficulty: 'Iniciante', thumbnail: '', videoUrl: '', pdfUrl: '', description: '' });
       setIsAdding(false);
       setEditingCourse(null);
+    } catch (err) {
+      alert("Erro ao salvar curso: " + err);
     }
   };
 
@@ -1485,7 +1539,8 @@ const AdminView: React.FC<{
       difficulty: course.difficulty, 
       thumbnail: course.thumbnail,
       videoUrl: course.videoUrl || '',
-      pdfUrl: course.pdfUrl || ''
+      pdfUrl: course.pdfUrl || '',
+      description: course.description || ''
     });
     setIsAdding(true);
   };
@@ -1781,7 +1836,17 @@ const AdminView: React.FC<{
                   <form onSubmit={handleSubmitCourse} className="p-6 space-y-4">
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1">Título da Aula</label>
-                      <input type="text" required value={newCourse.title} onChange={(e) => setNewCourse({...newCourse, title: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200" />
+                      <input type="text" required value={newCourse.title} onChange={(e) => setNewCourse({...newCourse, title: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none transition-all" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Descrição Detalhada / Resumo da Aula</label>
+                      <textarea 
+                        required 
+                        value={newCourse.description} 
+                        onChange={(e) => setNewCourse({...newCourse, description: e.target.value})} 
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-[#3B82F6] focus:border-transparent outline-none transition-all h-20 resize-none text-sm" 
+                        placeholder="Insira as informações profissionais, tópicos abordados nesta aula..."
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -1894,14 +1959,36 @@ const MediaModal: React.FC<{
   onClose: () => void,
   onPrev?: () => void,
   onNext?: () => void,
-  onTypeChange?: (type: 'video' | 'pdf') => void
-}> = ({ isOpen, type, course, onClose, onPrev, onNext, onTypeChange }) => {
+  onTypeChange?: (type: 'video' | 'pdf') => void,
+  isCompleted?: boolean,
+  onToggleComplete?: (id: string) => void
+}> = ({ isOpen, type, course, onClose, onPrev, onNext, onTypeChange, isCompleted, onToggleComplete }) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const [playbackRate, setPlaybackRate] = React.useState(1);
   const [currentTab, setCurrentTab] = useState<'video' | 'pdf'>('video');
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isPipActive, setIsPipActive] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [videoState, setVideoState] = useState<'loading' | 'playing' | 'paused' | 'error'>('loading');
+  const [diagnosticLogs, setDiagnosticLogs] = useState<string[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
+
+  const addLog = (msg: string) => {
+    setDiagnosticLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     if (isOpen && type) {
@@ -1932,12 +2019,45 @@ const MediaModal: React.FC<{
     };
   }, [isOpen, currentTab, course]);
 
+  useEffect(() => {
+    if (isOpen && course) {
+      setVideoState('loading');
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      const logs = [];
+      logs.push(`Painel aberto para o curso: "${course.title}"`);
+      if (course.videoUrl) {
+        logs.push(`URL original recebida: ${course.videoUrl}`);
+        const typeStr = getUrlType(course.videoUrl);
+        logs.push(`Tipo de mídia identificada: ${typeStr}`);
+        const converted = getEmbedUrl(course.videoUrl);
+        logs.push(`URL convertida para reprodução: ${converted}`);
+      } else {
+        logs.push(`Aviso: Este treinamento não possui URL de vídeo cadastrada.`);
+      }
+      setDiagnosticLogs(logs);
+
+      // Auto play for direct videos after simple timeout
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.play().then(() => {
+            setIsPlaying(true);
+            setVideoState('playing');
+          }).catch(() => {
+            addLog("Tentativa de auto-play bloqueada pelo navegador.");
+            setVideoState('paused');
+          });
+        }
+      }, 500);
+    }
+  }, [isOpen, course]);
+
   if (!course) return null;
 
   const isVideoBlob = course.videoUrl?.startsWith('blob:');
   const isPdfBlob = course.pdfUrl?.startsWith('blob:');
 
-  // Detecção robusta para links diretos (Vercel, MP4, etc)
   const isDirectVideo = (url: string) => {
     return url.startsWith('blob:') || 
            url.includes('.mp4') || 
@@ -1947,15 +2067,170 @@ const MediaModal: React.FC<{
            url.includes('firebasestorage.googleapis.com');
   };
 
+  const getUrlType = (url: string) => {
+    if (!url) return 'Vazia';
+    const parsed = url.toLowerCase();
+    if (parsed.includes('youtube.com') || parsed.includes('youtu.be')) return 'YouTube';
+    if (parsed.includes('vimeo.com')) return 'Vimeo (Player)';
+    if (parsed.includes('sharepoint.com')) return 'SharePoint';
+    if (parsed.includes('onedrive.live.com')) return 'OneDrive';
+    if (parsed.includes('drive.google.com')) return 'Google Drive';
+    if (parsed.startsWith('blob:') || isDirectVideo(url)) return 'Link Direto / MP4 (HTML5)';
+    return 'URL de Internet Geral';
+  };
+
+  const getEmbedUrl = (url: string) => {
+    if (!url) return '';
+    let parsedUrl = url.trim();
+
+    // 1. YouTube
+    if (parsedUrl.includes('youtube.com') || parsedUrl.includes('youtu.be')) {
+      if (parsedUrl.includes('watch?v=')) {
+        parsedUrl = parsedUrl.replace('watch?v=', 'embed/');
+      } else if (parsedUrl.includes('youtu.be/')) {
+        parsedUrl = parsedUrl.replace('youtu.be/', 'youtube.com/embed/');
+      } else if (parsedUrl.includes('/shorts/')) {
+        parsedUrl = parsedUrl.replace('/shorts/', '/embed/');
+      }
+      return parsedUrl;
+    }
+
+    // 1.1 Vimeo
+    if (parsedUrl.includes('vimeo.com')) {
+      const vimeoIdMatch = parsedUrl.match(/vimeo\.com\/(\d+)/);
+      if (vimeoIdMatch) {
+         return `https://player.vimeo.com/video/${vimeoIdMatch[1]}?autoplay=1`;
+      }
+      return parsedUrl;
+    }
+
+    // 2. Google Drive
+    if (parsedUrl.includes('drive.google.com')) {
+      if (parsedUrl.includes('/view')) {
+        parsedUrl = parsedUrl.split('/view')[0] + '/preview';
+      } else if (!parsedUrl.endsWith('/preview') && parsedUrl.includes('/file/d/')) {
+        const parts = parsedUrl.split('/file/d/');
+        if (parts[1]) {
+          const id = parts[1].split('/')[0];
+          parsedUrl = `https://drive.google.com/file/d/${id}/preview`;
+        }
+      }
+      return parsedUrl;
+    }
+
+    // 3. SharePoint and OneDrive
+    if (parsedUrl.includes('sharepoint.com')) {
+      if (parsedUrl.includes('Embed.aspx')) return parsedUrl;
+      const sharepointMatch = parsedUrl.match(/(https:\/\/[^\/]+)\/:v:\/s\/([^\/]+)\/([^\/?]+)/);
+      if (sharepointMatch) {
+        const [_, domain, site, id] = sharepointMatch;
+        return `${domain}/sites/${site}/_layouts/15/Embed.aspx?UniqueId=${id}&action=embedview`;
+      }
+      
+      const personalMatch = parsedUrl.match(/(https:\/\/[^\/]+)\/:v:\/g\/personal\/([^\/]+)\/([^\/?]+)/);
+      if (personalMatch) {
+        const [_, domain, user, id] = personalMatch;
+        return `${domain}/personal/${user}/_layouts/15/Embed.aspx?UniqueId=${id}&action=embedview`;
+      }
+
+      try {
+        const urlObj = new URL(parsedUrl);
+        urlObj.searchParams.set('action', 'embedview');
+        return urlObj.toString();
+      } catch (e) {
+        if (!parsedUrl.includes('action=embedview')) {
+          parsedUrl += parsedUrl.includes('?') ? '&action=embedview' : '?action=embedview';
+        }
+        return parsedUrl;
+      }
+    }
+
+    if (parsedUrl.includes('onedrive.live.com')) {
+      if (parsedUrl.includes('Embed.aspx')) return parsedUrl;
+      try {
+        const urlObj = new URL(parsedUrl);
+        urlObj.searchParams.set('action', 'embedview');
+        return urlObj.toString();
+      } catch (e) {
+        if (!parsedUrl.includes('action=embedview')) {
+          parsedUrl += parsedUrl.includes('?') ? '&action=embedview' : '?action=embedview';
+        }
+        return parsedUrl;
+      }
+    }
+
+    return parsedUrl;
+  };
+
+  const getPdfEmbedUrl = (url: string) => {
+    if (!url) return '';
+    let parsedUrl = url.trim();
+
+    if (parsedUrl.includes('drive.google.com')) {
+      if (parsedUrl.includes('/view')) {
+        parsedUrl = parsedUrl.split('/view')[0] + '/preview';
+      } else if (!parsedUrl.endsWith('/preview') && parsedUrl.includes('/file/d/')) {
+        const parts = parsedUrl.split('/file/d/');
+        if (parts[1]) {
+          const id = parts[1].split('/')[0];
+          parsedUrl = `https://drive.google.com/file/d/${id}/preview`;
+        }
+      }
+      return parsedUrl;
+    }
+
+    if (parsedUrl.includes('sharepoint.com')) {
+      const sharepointMatch = parsedUrl.match(/(https:\/\/[^\/]+)\/:f:\/s\/([^\/]+)\/([^\/?]+)/) || 
+                              parsedUrl.match(/(https:\/\/[^\/]+)\/:v:\/s\/([^\/]+)\/([^\/?]+)/);
+      if (sharepointMatch) {
+        const [_, domain, site, id] = sharepointMatch;
+        return `${domain}/sites/${site}/_layouts/15/Embed.aspx?UniqueId=${id}&action=embedview`;
+      }
+
+      const personalMatch = parsedUrl.match(/(https:\/\/[^\/]+)\/:f:\/g\/personal\/([^\/]+)\/([^\/?]+)/) ||
+                            parsedUrl.match(/(https:\/\/[^\/]+)\/:v:\/g\/personal\/([^\/]+)\/([^\/?]+)/);
+      if (personalMatch) {
+        const [_, domain, user, id] = personalMatch;
+        return `${domain}/personal/${user}/_layouts/15/Embed.aspx?UniqueId=${id}&action=embedview`;
+      }
+
+      try {
+        const urlObj = new URL(parsedUrl);
+        urlObj.searchParams.set('action', 'embedview');
+        return urlObj.toString();
+      } catch (e) {
+        if (!parsedUrl.includes('action=embedview')) {
+          parsedUrl += parsedUrl.includes('?') ? '&action=embedview' : '?action=embedview';
+        }
+        return parsedUrl;
+      }
+    }
+
+    if (parsedUrl.includes('onedrive.live.com')) {
+      try {
+        const urlObj = new URL(parsedUrl);
+        urlObj.searchParams.set('action', 'embedview');
+        return urlObj.toString();
+      } catch (e) {
+        if (!parsedUrl.includes('action=embedview')) {
+          parsedUrl += parsedUrl.includes('?') ? '&action=embedview' : '?action=embedview';
+        }
+        return parsedUrl;
+      }
+    }
+
+    return parsedUrl;
+  };
+
   const videoSrc = course.videoUrl && course.videoUrl !== "" && !course.videoUrl.startsWith('file://')
-    ? (course.videoUrl.includes('youtube.com') || course.videoUrl.includes('youtu.be')
-        ? course.videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')
-        : course.videoUrl)
+    ? getEmbedUrl(course.videoUrl)
     : null;
     
   const pdfSrc = course.pdfUrl && !course.pdfUrl.startsWith('file://') 
     ? course.pdfUrl 
     : null;
+
+  const pdfEmbedSrc = pdfSrc ? getPdfEmbedUrl(pdfSrc) : null;
 
   const handleTimeUpdate = () => {
     if (videoRef.current) {
@@ -1972,11 +2247,14 @@ const MediaModal: React.FC<{
   const handlePlayPause = () => {
     if (videoRef.current) {
       if (videoRef.current.paused) {
-        videoRef.current.play();
-        setIsPlaying(true);
+        videoRef.current.play().then(() => {
+          setIsPlaying(true);
+          setVideoState('playing');
+        });
       } else {
         videoRef.current.pause();
         setIsPlaying(false);
+        setVideoState('paused');
       }
     }
   };
@@ -1998,6 +2276,9 @@ const MediaModal: React.FC<{
   const handleSeek = (offset: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime += offset;
+      addLog(`Pulou ${offset > 0 ? '+' : ''}${offset} segundos.`);
+    } else {
+      addLog("Buscar por tempo (Seek/Skip) só funciona para arquivos diretos (MP4).");
     }
   };
 
@@ -2005,45 +2286,97 @@ const MediaModal: React.FC<{
     if (videoRef.current) {
       videoRef.current.playbackRate = rate;
       setPlaybackRate(rate);
+      addLog(`Velocidade de reprodução alterada para ${rate}x.`);
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    setVolume(val);
+    if (videoRef.current) {
+      videoRef.current.volume = val;
+      videoRef.current.muted = val === 0;
+      setIsMuted(val === 0);
+    }
+  };
+
+  const handleMuteToggle = () => {
+    if (videoRef.current) {
+      const nextMute = !videoRef.current.muted;
+      videoRef.current.muted = nextMute;
+      setIsMuted(nextMute);
+    } else {
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const togglePictureInPicture = async () => {
+    if (videoRef.current) {
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+          setIsPipActive(false);
+        } else if (document.pictureInPictureEnabled) {
+          await videoRef.current.requestPictureInPicture();
+          setIsPipActive(true);
+        }
+      } catch (err: any) {
+        addLog(`Picture-in-Picture: ${err.message}`);
+      }
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (containerRef.current) {
+      if (!document.fullscreenElement) {
+        containerRef.current.requestFullscreen().then(() => {
+          setIsFullscreen(true);
+        }).catch(err => {
+          addLog(`Erro ao ativar Tela Cheia: ${err.message}`);
+        });
+      } else {
+        document.exitFullscreen().then(() => {
+          setIsFullscreen(false);
+        });
+      }
     }
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/90 backdrop-blur-md overflow-y-auto">
           <motion.div 
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-full sm:max-w-[95vw] lg:max-w-[90vw] overflow-hidden flex flex-col h-full sm:h-auto sm:max-h-[95vh]"
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl my-auto overflow-hidden flex flex-col h-auto max-h-[98vh] border border-slate-100"
           >
+            {/* Header Modal */}
             <div className="p-4 sm:p-6 border-b border-slate-100 flex justify-between items-center bg-white">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
                   <GraduationCap size={20} />
                 </div>
-                <div className="max-w-[150px] sm:max-w-[300px] lg:max-w-none">
-                  <h3 className="text-base sm:text-xl font-bold text-slate-900 truncate">{course.title}</h3>
+                <div className="max-w-[200px] sm:max-w-[400px] lg:max-w-none text-left">
+                  <h3 className="text-sm sm:text-lg font-black text-slate-900 truncate leading-tight">{course.title}</h3>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-[#3B82F6] font-bold uppercase tracking-wider">{course.system}</span>
-                    <span className="text-slate-300">•</span>
-                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                    <span className="text-[9px] text-[#3B82F6] font-extrabold uppercase tracking-widest">{course.system}</span>
+                    <span className="text-slate-300 text-xs">•</span>
+                    <p className="text-[9px] text-slate-500 uppercase font-extrabold tracking-widest">
                       {currentTab === 'pdf' ? 'Material de Apoio' : 'Vídeo Aula'}
                     </p>
                   </div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={onClose} 
-                  className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
-                  aria-label="Fechar"
-                >
-                  <X size={24} />
-                </button>
-              </div>
+              <button 
+                onClick={onClose} 
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-550 transition-colors"
+                aria-label="Fechar"
+              >
+                <X size={20} />
+              </button>
             </div>
 
             {/* Selector de Abas se ambos existirem */}
@@ -2051,293 +2384,481 @@ const MediaModal: React.FC<{
               <div className="flex border-b border-slate-100 bg-slate-50/50 p-1.5 gap-2">
                 <button
                   onClick={() => setCurrentTab('video')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs sm:text-sm font-bold rounded-xl transition-all ${
                     currentTab === 'video'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                   }`}
                 >
-                  <Play size={16} />
+                  <Play size={14} fill={currentTab === 'video' ? 'currentColor' : 'none'} />
                   Vídeo Aula
                 </button>
                 <button
                   onClick={() => setCurrentTab('pdf')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold rounded-xl transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs sm:text-sm font-bold rounded-xl transition-all ${
                     currentTab === 'pdf'
                       ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                   }`}
                 >
-                  <FileText size={16} />
+                  <FileText size={14} />
                   Material de Apoio (PDF)
                 </button>
               </div>
             )}
 
-            <div className="flex-1 bg-white overflow-hidden relative flex flex-col h-full">
-              <div className="flex-1 overflow-y-auto scroll-smooth">
-                {!videoSrc && !pdfSrc ? (
-                  <div className="flex flex-col items-center justify-center p-12 sm:p-20 text-center">
-                    <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-6">
-                      <GraduationCap size={40} />
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-2">Conteúdo em construção</h3>
-                    <p className="text-slate-500 max-w-md">Esta aula ainda não possui vídeo ou material PDF anexado.</p>
+            <div className="flex-1 overflow-y-auto max-h-[70vh] bg-slate-50">
+              {!videoSrc && !pdfSrc ? (
+                <div className="flex flex-col items-center justify-center p-12 sm:p-20 text-center">
+                  <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-4">
+                    <GraduationCap size={32} />
                   </div>
-                ) : (
-                  <div className="flex flex-col">
-                    {/* Vídeo Aula - Visível apenas quando tab === 'video' */}
-                    {videoSrc && currentTab === 'video' && (
-                      <div className="bg-slate-900 w-full">
-                        <div className="max-w-6xl mx-auto w-full aspect-video relative group flex items-center justify-center bg-black">
-                          {isDirectVideo(videoSrc) ? (
-                            <>
-                              <video 
-                                key={videoSrc}
-                                ref={videoRef}
-                                src={videoSrc} 
-                                className="w-full h-full object-contain cursor-pointer" 
-                                controls={false}
-                                autoPlay 
-                                playsInline
-                                onTimeUpdate={handleTimeUpdate}
-                                onLoadedMetadata={handleLoadedMetadata}
-                                onPlay={() => setIsPlaying(true)}
-                                onPause={() => setIsPlaying(false)}
-                                onClick={handlePlayPause}
-                              />
-                              
-                              {/* Central Play/Pause Hint */}
-                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <AnimatePresence>
-                                  {!isPlaying && (
-                                    <motion.div 
-                                      initial={{ scale: 0.8, opacity: 0 }}
-                                      animate={{ scale: 1, opacity: 1 }}
-                                      exit={{ scale: 1.2, opacity: 0 }}
-                                      className="w-20 h-20 bg-blue-600/80 text-white rounded-full flex items-center justify-center shadow-2xl backdrop-blur-sm"
-                                    >
-                                      <Play size={40} fill="currentColor" className="ml-1" />
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-1">Conteúdo em construção</h3>
+                  <p className="text-slate-500 text-xs max-w-sm">Esta aula ainda não possui vídeo ou material PDF anexado.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col">
+                  {/* Vídeo Aula - Visível apenas quando tab === 'video' */}
+                  {videoSrc && currentTab === 'video' && (
+                    <div className="bg-slate-950 p-2 sm:p-4">
+                      {/* Responsive video container */}
+                      <div 
+                        ref={containerRef}
+                        className={`group relative flex items-center justify-center bg-black overflow-hidden mx-auto transition-all ${
+                          isFullscreen 
+                            ? 'w-screen h-screen' 
+                            : 'w-full max-w-4xl aspect-video rounded-2xl shadow-2xl border border-slate-800'
+                        }`}
+                      >
+                        {/* Loading Ring overlay */}
+                        {videoState === 'loading' && (
+                          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 z-30">
+                            <Loader2 className="animate-spin text-blue-500" size={36} />
+                            <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">Carregando aula segura...</span>
+                          </div>
+                        )}
 
-                              {/* Custom Controls Overlay */}
-                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-4 sm:p-8 opacity-0 group-hover:opacity-100 transition-all duration-300 z-20">
-                                {/* Progress Bar */}
-                                <div className="mb-6 group/timeline relative">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] sm:text-xs font-mono text-white/70">{formatTime(currentTime)}</span>
-                                    <span className="text-[10px] sm:text-xs font-mono text-white/70">{formatTime(duration)}</span>
-                                  </div>
-                                  <div className="relative h-1.5 sm:h-2 bg-white/10 rounded-full overflow-hidden cursor-pointer">
-                                    <input 
-                                      type="range"
-                                      min="0"
-                                      max={duration || 0}
-                                      step="0.1"
-                                      value={currentTime}
-                                      onChange={handleSeekChange}
-                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                    />
-                                    <div 
-                                      className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-100"
-                                      style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-                                    />
-                                    <div 
-                                      className="absolute top-0 h-full w-1 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] transition-all duration-100"
-                                      style={{ left: `${(currentTime / (duration || 1)) * 100}%` }}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3 sm:gap-6">
-                                    <button 
-                                      onClick={handlePlayPause}
-                                      className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-all text-white backdrop-blur-md"
-                                    >
-                                      {isPlaying ? (
-                                        <Pause size={24} fill="currentColor" />
-                                      ) : (
-                                        <Play size={24} fill="currentColor" className="ml-1" />
-                                      )}
-                                    </button>
-
-                                    <div className="flex items-center gap-2">
-                                      <button 
-                                        onClick={() => handleSeek(-10)}
-                                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white"
-                                        title="Voltar 10s"
-                                      >
-                                        <RotateCcw size={20} />
-                                      </button>
-                                      
-                                      <button 
-                                        onClick={() => handleSeek(10)}
-                                        className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white"
-                                        title="Avançar 10s"
-                                      >
-                                        <RotateCw size={20} />
-                                      </button>
-                                    </div>
-
-                                    <div className="hidden sm:flex items-center gap-1.5 ml-4 p-1 bg-white/5 rounded-xl border border-white/10">
-                                      {[1, 1.25, 1.5, 2].map(rate => (
-                                        <button
-                                          key={rate}
-                                          onClick={() => handleRateChange(rate)}
-                                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                                            playbackRate === rate 
-                                              ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
-                                              : 'text-white/40 hover:text-white hover:bg-white/10'
-                                          }`}
-                                        >
-                                          {rate}x
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-4">
-                                    <button 
-                                      onClick={() => {
-                                        if (videoRef.current) {
-                                          if (videoRef.current.requestFullscreen) {
-                                            videoRef.current.requestFullscreen();
-                                          }
-                                        }
-                                      }}
-                                      className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/80 hover:text-white"
-                                      title="Tela Cheia"
-                                    >
-                                      <Maximize size={20} />
-                                    </button>
-                                    <a 
-                                      href={videoSrc || '#'}
-                                      download={`${course.title}.mp4`}
-                                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-blue-600/20"
-                                      title="Baixar Vídeo"
-                                    >
-                                      <Download size={16} />
-                                      <span className="hidden sm:inline">Baixar</span>
-                                    </a>
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <iframe 
-                              src={videoSrc} 
-                              className="w-full h-full border-0 aspect-video"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                              title="Vídeo Aula"
-                            ></iframe>
-                          )}
+                        {/* Status Label on Screen */}
+                        <div className="absolute top-4 right-4 z-20 flex gap-2 pointer-events-none mb-1 shadow-lg shadow-black/10">
+                          <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full text-white flex items-center gap-1.5 backdrop-blur-md ${
+                            videoState === 'loading' ? 'bg-amber-600/80' :
+                            videoState === 'playing' ? 'bg-emerald-600/80' :
+                            videoState === 'paused' ? 'bg-slate-600/80' :
+                            'bg-red-600/80'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full bg-white ${videoState === 'playing' || videoState === 'loading' ? 'animate-ping' : ''}`} />
+                            {videoState === 'loading' ? 'Carregando' :
+                             videoState === 'playing' ? 'Reproduzindo' :
+                             videoState === 'paused' ? 'Pausado' :
+                             'Visualização Externa'}
+                          </span>
                         </div>
-                      </div>
-                    )}
 
-                    {/* Material de Apoio (PDF) - Visível apenas quando tab === 'pdf' */}
-                    {pdfSrc && currentTab === 'pdf' && (
-                      <div className="p-6 sm:p-12 bg-slate-50">
-                        <div className="max-w-4xl mx-auto">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
-                            <div className="flex items-center gap-4">
-                              <div className="p-3 rounded-xl bg-emerald-100 text-emerald-600">
-                                <FileText size={24} />
-                              </div>
+                        {/* Warning overlay for SharePoint and OneDrive */}
+                        {videoSrc && (videoSrc.includes('sharepoint.com') || videoSrc.includes('onedrive.live.com') || videoSrc.includes('drive.google.com')) && (
+                          <div className="absolute top-4 left-4 right-4 z-10 bg-slate-900/95 border border-amber-500/30 text-white p-3 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs backdrop-blur-md shadow-xl transition-opacity hover:opacity-100 opacity-95 text-left max-w-[95%]">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
                               <div>
-                                <h4 className="text-xl font-bold text-slate-900">Material de Apoio</h4>
-                                <p className="text-sm text-slate-500">Documentação técnica e guias em PDF.</p>
+                                <p className="font-bold text-amber-400">Restrição de Login Corporativo</p>
+                                <p className="text-slate-300 text-[10px] sm:text-[11px]">
+                                  Se o vídeo não carregar ou pedir login, clique ao lado para abrir.
+                                </p>
                               </div>
                             </div>
                             <a 
-                              href={pdfSrc} 
-                              download={`${course.title}.pdf`}
-                              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-100/50"
+                              href={course.videoUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 font-bold rounded-lg text-[10px] sm:text-xs transition-colors text-white"
                             >
-                              <Download size={18} />
-                              Baixar Manual
+                              <ExternalLink size={10} />
+                              Assistir Externo
                             </a>
                           </div>
+                        )}
 
-                          <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+                        {isDirectVideo(videoSrc) ? (
+                          <>
+                            <video 
+                              key={videoSrc}
+                              ref={videoRef}
+                              src={videoSrc} 
+                              className="w-full h-full object-contain cursor-pointer" 
+                              controls={false}
+                              autoPlay 
+                              playsInline
+                              onTimeUpdate={handleTimeUpdate}
+                              onLoadedMetadata={handleLoadedMetadata}
+                              onPlay={() => { setIsPlaying(true); setVideoState('playing'); }}
+                              onPause={() => { setIsPlaying(false); setVideoState('paused'); }}
+                              onClick={handlePlayPause}
+                              onWaiting={() => setVideoState('loading')}
+                              onPlaying={() => setVideoState('playing')}
+                              onError={() => { setVideoState('error'); addLog("Erro crítico de renderização de vídeo direto."); }}
+                            />
+                            
+                            {/* Central Pause Overlay Indicator */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <AnimatePresence>
+                                {!isPlaying && (
+                                  <motion.div 
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 1.2, opacity: 0 }}
+                                    className="w-14 h-14 bg-blue-600/80 text-white rounded-full flex items-center justify-center shadow-2xl backdrop-blur-sm"
+                                  >
+                                    <Play size={24} fill="currentColor" className="ml-0.5" />
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+
+                            {/* Custom Controls Overlay for direct video */}
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent p-4 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200 z-20 flex flex-col gap-2 text-left">
+                              {/* Progress bar timeline */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-mono text-white/90">{formatTime(currentTime)}</span>
+                                <div className="flex-1 relative h-1 bg-white/20 rounded-full cursor-pointer group/bar">
+                                  <input 
+                                    type="range"
+                                    min="0"
+                                    max={duration || 0}
+                                    step="0.1"
+                                    value={currentTime}
+                                    onChange={handleSeekChange}
+                                    className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
+                                  />
+                                  <div 
+                                    className="absolute top-0 left-0 h-full bg-blue-500 rounded-full"
+                                    style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                                  />
+                                  <div 
+                                    className="absolute top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-white scale-0 group-hover/bar:scale-100 transition-transform duration-100"
+                                    style={{ left: `calc(${(currentTime / (duration || 1)) * 100}% - 5px)` }}
+                                  />
+                                </div>
+                                <span className="text-[9px] font-mono text-white/90">{formatTime(duration)}</span>
+                              </div>
+
+                              {/* Controls row */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <button 
+                                    onClick={handlePlayPause}
+                                    className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                                  >
+                                    {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                                  </button>
+
+                                  {/* Volume slider control */}
+                                  <div className="flex items-center gap-1 group/vol">
+                                    <button onClick={handleMuteToggle} className="text-white/80 hover:text-white p-1">
+                                      {isMuted ? <VolumeX size={14} /> : volume < 0.5 ? <Volume1 size={14} /> : <Volume2 size={14} />}
+                                    </button>
+                                    <input 
+                                      type="range"
+                                      min="0"
+                                      max="1"
+                                      step="0.1"
+                                      value={isMuted ? 0 : volume}
+                                      onChange={handleVolumeChange}
+                                      className="w-12 h-1 bg-white/20 rounded appearance-none cursor-pointer accent-blue-500"
+                                    />
+                                  </div>
+
+                                  {/* Speed setting */}
+                                  <div className="flex gap-1">
+                                    {[1, 1.5, 2].map(rate => (
+                                      <button 
+                                        key={rate} 
+                                        onClick={() => handleRateChange(rate)}
+                                        className={`px-1.5 py-0.5 rounded text-[8px] font-black ${playbackRate === rate ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+                                      >
+                                        {rate}x
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <button onClick={togglePictureInPicture} className="text-white/80 hover:text-white p-1" title="Picture-in-Picture">
+                                    <ExternalLink size={14} />
+                                  </button>
+                                  <button onClick={toggleFullscreen} className="text-white/80 hover:text-white p-1" title="Tela Cheia">
+                                    <Maximize size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="w-full h-full relative">
+                            {/* Iframe wrapper for general, YouTube, vimeo, sharepoint links */}
                             <iframe 
-                              src={pdfSrc} 
-                              className="w-full min-h-[800px] border-0"
-                              title="Material PDF"
+                              src={videoSrc || undefined} 
+                              className="w-full h-full border-0 aspect-video rounded-2xl"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              title="Vídeo Aula"
+                              onLoad={() => {
+                                setVideoState('playing');
+                                addLog("Iframe carregado e pronto.");
+                              }}
+                              onError={() => {
+                                setVideoState('error');
+                                addLog("Falha ao embutir link no iframe.");
+                              }}
                             ></iframe>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Integrated Action & Navigation Bar below player */}
+                      <div className="max-w-4xl mx-auto mt-3 bg-slate-900 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-white border border-slate-800">
+                        {/* 10s Rewind / Fast Forward */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleSeek(-10)}
+                            disabled={!isDirectVideo(videoSrc)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                              isDirectVideo(videoSrc) 
+                                ? 'bg-slate-800 hover:bg-slate-700 text-white' 
+                                : 'bg-slate-800/40 text-slate-600 cursor-not-allowed'
+                            }`}
+                            title={isDirectVideo(videoSrc) ? "Voltar 10 segundos" : "Disponível apenas para arquivos locais de vídeo"}
+                          >
+                            <RotateCcw size={12} />
+                            Rebobinar 10s
+                          </button>
+                          
+                          <button
+                            onClick={() => handleSeek(10)}
+                            disabled={!isDirectVideo(videoSrc)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
+                              isDirectVideo(videoSrc) 
+                                ? 'bg-slate-800 hover:bg-slate-700 text-white' 
+                                : 'bg-slate-800/40 text-slate-600 cursor-not-allowed'
+                            }`}
+                            title={isDirectVideo(videoSrc) ? "Avançar 10 segundos" : "Disponível apenas para arquivos locais de vídeo"}
+                          >
+                            Avançar 10s
+                            <RotateCw size={12} />
+                          </button>
+                        </div>
+
+                        {/* Navigation: Prev / Next */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={onPrev}
+                            disabled={!onPrev}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                              onPrev 
+                                ? 'bg-transparent text-blue-400 border border-blue-500/30 hover:bg-blue-500/10' 
+                                : 'text-slate-600 cursor-not-allowed'
+                            }`}
+                          >
+                            <ChevronLeft size={14} />
+                            Aula Anterior
+                          </button>
+
+                          <button
+                            onClick={onNext}
+                            disabled={!onNext}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                              onNext 
+                                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                                : 'text-slate-600 bg-slate-805 cursor-not-allowed'
+                            }`}
+                          >
+                            Próxima Aula
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+
+                        {/* External Actions & Diagnostic toggles */}
+                        <div className="flex items-center gap-2">
+                          {course.videoUrl && (
+                            <a 
+                              href={course.videoUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-[11px] font-bold"
+                            >
+                              <ExternalLink size={12} />
+                              Nova Aba
+                            </a>
+                          )}
+                          <button
+                            onClick={() => setShowLogs(!showLogs)}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
+                              showLogs ? 'bg-indigo-600/30 text-indigo-400 border-indigo-500/50' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                            }`}
+                          >
+                            Diagnóstico
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Diagnostic logs output console */}
+                  {showLogs && (
+                    <div className="mx-4 sm:mx-8 mt-3 bg-slate-900 border border-slate-800 rounded-xl p-4 font-mono text-[11px] text-emerald-400 max-h-36 overflow-y-auto text-left">
+                      <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
+                        <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Log de Diagnóstico Técnico de Mídia
+                        </span>
+                        <button 
+                          onClick={() => setDiagnosticLogs([])}
+                          className="text-[9px] bg-slate-800 px-2 py-0.5 rounded hover:text-white"
+                        >
+                          Limpar
+                        </button>
+                      </div>
+                      <div className="space-y-0.5">
+                        {diagnosticLogs.map((log, index) => (
+                          <p key={index}>{log}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Material de Apoio (PDF) - Visível apenas quando tab === 'pdf' */}
+                  {pdfSrc && currentTab === 'pdf' && (
+                    <div className="p-4 sm:p-8 bg-slate-100">
+                      <div className="max-w-4xl mx-auto">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 text-left">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+                              <FileText size={20} />
+                            </div>
+                            <div>
+                              <h4 className="text-base sm:text-lg font-bold text-slate-900">Material de Apoio Oficial</h4>
+                              <p className="text-xs text-slate-500">Documentação e guias operacionais em PDF.</p>
+                            </div>
+                          </div>
+                          <a 
+                            href={pdfSrc} 
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow"
+                          >
+                            <Download size={14} />
+                            Baixar Documentação
+                          </a>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+                          <iframe 
+                            src={pdfEmbedSrc || undefined} 
+                            className="w-full min-h-[500px] border-0"
+                            title="Material PDF"
+                          ></iframe>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Informações detalhadas da aula */}
+                  <div className="p-4 sm:p-6 md:p-8 bg-white grid grid-cols-1 lg:grid-cols-3 gap-6 text-left">
+                    <div className="lg:col-span-2 space-y-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-2 py-0.5 text-[10px] sm:text-xs font-black rounded-lg ${course.system === '7Edu' ? 'bg-blue-550/10 text-blue-600' : 'bg-indigo-550/10 text-indigo-600'}`}>
+                          {course.system}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className={`px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-lg ${
+                          course.difficulty === 'Iniciante' ? 'bg-emerald-50 text-emerald-600' :
+                          course.difficulty === 'Intermediário' ? 'bg-amber-50 text-amber-600' :
+                          'bg-rose-50 text-rose-600'
+                        }`}>
+                          {course.difficulty}
+                        </span>
+                      </div>
+
+                      <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+                        {course.title}
+                      </h1>
+
+                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-2xl font-normal">
+                        {course.description || "Esta aula aborda as diretrizes essenciais, instruções e melhores práticas recomendadas para o domínio operacional dos processos administrativos."}
+                      </p>
+                    </div>
+
+                    {/* Progress Toggle Card */}
+                    <div className="bg-slate-50 border border-slate-250/20 p-4 rounded-2xl flex flex-col justify-between gap-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider mb-2">Seu Progresso</h4>
+                        
+                        <div className="p-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between gap-3 shadow-sm hover:border-slate-200 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 size={16} className={isCompleted ? "text-emerald-500" : "text-slate-300"} />
+                            <div className="text-left leading-tight">
+                              <p className="text-xs font-bold text-slate-800">Concluído</p>
+                              <p className="text-[9px] text-slate-500">Registre sua evolução</p>
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => onToggleComplete?.(course.id)}
+                            className={`h-5 w-11 rounded-full p-0.5 transition-colors relative duration-200 outline-none ${
+                              isCompleted ? 'bg-emerald-500' : 'bg-slate-350'
+                            }`}
+                          >
+                            <div className={`h-4 w-4 rounded-full bg-white transition-all shadow-md ${
+                              isCompleted ? 'translate-x-6' : 'translate-x-0'
+                            }`} />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <div className="p-2.5 bg-white border border-slate-100 rounded-lg text-left">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase block">Duração</span>
+                            <span className="text-xs text-slate-800 font-extrabold flex items-center gap-1 mt-0.5">
+                              <Clock size={12} className="text-[#3B82F6]" />
+                              {course.duration}
+                            </span>
+                          </div>
+                          <div className="p-2.5 bg-white border border-slate-100 rounded-lg text-left">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase block">Nível</span>
+                            <span className="text-xs text-slate-800 font-extrabold flex items-center gap-1 mt-0.5">
+                              <BarChart size={12} className="text-[#3B82F6]" />
+                              {course.difficulty}
+                            </span>
                           </div>
                         </div>
                       </div>
-                    )}
+
+                      <div className="flex flex-col gap-1.5">
+                        {course.videoUrl && (
+                          <a 
+                            href={course.videoUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-2 px-3 rounded-lg shadow-sm"
+                          >
+                            <Download size={12} />
+                            Fazer Download / Assistir
+                          </a>
+                        )}
+                        {pdfSrc && (
+                          <a 
+                            href={pdfSrc} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs py-2 px-3 rounded-lg"
+                          >
+                            <FileText size={12} />
+                            Acessar PDF de Apoio
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)]">
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button 
-                  onClick={onPrev}
-                  disabled={!onPrev}
-                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold transition-all border text-sm ${
-                    onPrev 
-                      ? 'text-[#3B82F6] border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-300' 
-                      : 'text-slate-300 border-slate-100 bg-slate-50 cursor-not-allowed'
-                  }`}
-                >
-                  <ChevronLeft size={18} />
-                  Anterior
-                </button>
-                <button 
-                  onClick={onNext}
-                  disabled={!onNext}
-                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold transition-all text-sm ${
-                    onNext 
-                      ? 'bg-[#3B82F6] text-white hover:bg-[#2563EB] shadow-lg shadow-[#3B82F6]/20' 
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  Próximo
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-
-              <div className="hidden lg:flex items-center gap-4 text-slate-400 text-sm">
-                <div className="flex items-center gap-1">
-                  <Clock size={16} />
-                  <span>{course.duration}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <BarChart size={16} />
-                  <span>{course.difficulty}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                {currentTab === 'video' && pdfSrc && (
-                  <button 
-                    onClick={() => setCurrentTab('pdf')}
-                    className="flex-1 sm:flex-none px-4 py-3 rounded-xl font-bold transition-all border border-emerald-100 text-emerald-600 hover:bg-emerald-50 text-xs flex items-center gap-2"
-                  >
-                    <FileText size={14} />
-                    Ver Material PDF
-                  </button>
-                )}
-                {currentTab === 'pdf' && videoSrc && (
-                  <button 
-                    onClick={() => setCurrentTab('video')}
-                    className="flex-1 sm:flex-none px-4 py-3 rounded-xl font-bold transition-all border border-blue-100 text-[#3B82F6] hover:bg-blue-50 text-xs flex items-center gap-2"
-                  >
-                    <Play size={14} />
-                    Assistir Vídeo Aula
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           </motion.div>
         </div>
