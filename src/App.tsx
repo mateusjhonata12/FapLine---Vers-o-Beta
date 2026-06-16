@@ -28,6 +28,8 @@ import {
   Plus,
   Download,
   Video,
+  Smartphone,
+  Monitor,
   Upload,
   LogIn,
   ShieldCheck,
@@ -2465,6 +2467,7 @@ const MediaModal: React.FC<{
   const containerRef = React.useRef<HTMLDivElement>(null);
   const searchRef = React.useRef<HTMLDivElement>(null);
   const [playbackRate, setPlaybackRate] = React.useState(1);
+  const [videoFormat, setVideoFormat] = React.useState<'landscape' | 'portrait'>('landscape');
   const [currentTab, setCurrentTab] = useState<'video' | 'pdf'>('video');
   const [currentTime, setCurrentTime] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -2564,6 +2567,17 @@ const MediaModal: React.FC<{
       setCurrentTab(type);
     }
   }, [isOpen, type, course]);
+
+  useEffect(() => {
+    if (resolvedVideoUrl) {
+      const lower = resolvedVideoUrl.toLowerCase();
+      if (lower.includes('/shorts/') || lower.includes('tiktok.com') || lower.includes('reels') || lower.includes('vertical')) {
+        setVideoFormat('portrait');
+      } else {
+        setVideoFormat('landscape');
+      }
+    }
+  }, [resolvedVideoUrl, isOpen]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -2822,6 +2836,13 @@ const MediaModal: React.FC<{
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
+      const width = videoRef.current.videoWidth;
+      const height = videoRef.current.videoHeight;
+      if (width > 0 && height > 0) {
+        const isVertical = width < height;
+        setVideoFormat(isVertical ? 'portrait' : 'landscape');
+        addLog(`Dimensões do vídeo carregado: ${width}x${height} (Formato: ${isVertical ? 'Celular' : 'Padrão'})`);
+      }
     }
   };
 
@@ -3087,10 +3108,13 @@ const MediaModal: React.FC<{
                       {/* Responsive video container */}
                       <div 
                         ref={containerRef}
+                        style={!isFullscreen && videoFormat === 'portrait' ? { aspectRatio: '9/16' } : {}}
                         className={`group relative flex items-center justify-center bg-black overflow-hidden mx-auto transition-all ${
                           isFullscreen 
                             ? 'w-screen h-screen' 
-                            : 'w-full max-w-4xl aspect-video rounded-2xl shadow-2xl border border-slate-800'
+                            : videoFormat === 'portrait'
+                              ? 'w-full max-w-[340px] rounded-2xl shadow-2xl border border-slate-850'
+                              : 'w-full max-w-4xl aspect-video rounded-2xl shadow-2xl border border-slate-800'
                         }`}
                       >
                         {/* Loading Ring overlay */}
@@ -3260,7 +3284,7 @@ const MediaModal: React.FC<{
                             {/* Iframe wrapper for general, YouTube, vimeo, sharepoint links */}
                             <iframe 
                               src={videoSrc || undefined} 
-                              className="w-full h-full border-0 aspect-video rounded-2xl"
+                              className={`w-full h-full border-0 rounded-2xl ${videoFormat === 'landscape' ? 'aspect-video' : ''}`}
                               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                               allowFullScreen
                               title="Vídeo Aula"
@@ -3339,14 +3363,40 @@ const MediaModal: React.FC<{
                           </button>
                         </div>
 
-                        {/* External Actions & Diagnostic toggles */}
+                        {/* External Actions & Dynamic mobile form factor adaptation */}
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              const nextFormat = videoFormat === 'landscape' ? 'portrait' : 'landscape';
+                              setVideoFormat(nextFormat);
+                              addLog(`Formato do player alterado manualmente para ${nextFormat === 'portrait' ? 'Celular (9:16)' : 'Computador (16:9)'}.`);
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all border ${
+                              videoFormat === 'portrait' 
+                                ? 'bg-blue-600/30 text-blue-400 border-blue-500/50 hover:bg-blue-600/40' 
+                                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'
+                            }`}
+                            title={videoFormat === 'landscape' ? "Mudar layout para Formato Celular (Vertical)" : "Mudar layout para Formato Padrão (Horizontal)"}
+                          >
+                            {videoFormat === 'landscape' ? (
+                              <>
+                                <Smartphone size={13} className="text-blue-400" />
+                                <span>Design Celular</span>
+                              </>
+                            ) : (
+                              <>
+                                <Monitor size={13} className="text-blue-400" />
+                                <span>Design Horizontal</span>
+                              </>
+                            )}
+                          </button>
+
                           {course.videoUrl && (
                             <a 
                               href={course.videoUrl} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs sm:text-sm font-bold"
+                              className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs sm:text-sm font-bold border border-slate-700"
                             >
                               <ExternalLink size={13} />
                               Nova Aba
