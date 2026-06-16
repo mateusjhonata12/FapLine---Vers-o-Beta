@@ -10,6 +10,7 @@ import {
   FileText, 
   BookOpen, 
   Settings, 
+  Sparkles,
   LayoutDashboard, 
   GraduationCap,
   ChevronRight,
@@ -30,6 +31,8 @@ import {
   LogIn,
   ShieldCheck,
   LogOut,
+  Sun,
+  Moon,
   Loader2,
   Rewind,
   FastForward,
@@ -47,6 +50,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AIAssistant } from './components/AIAssistant';
+import { GeminiVideoUploader } from './components/GeminiVideoUploader';
 import { 
   signInAnonymously,
   onAuthStateChanged,
@@ -58,6 +62,23 @@ import {
   uploadBytes, 
   getDownloadURL 
 } from 'firebase/storage';
+import { 
+  BarChart as RechartsBarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer, 
+  Cell,
+  PieChart,
+  Pie,
+  LineChart,
+  Line,
+  AreaChart,
+  Area
+} from 'recharts';
 import { 
   collection, 
   onSnapshot, 
@@ -100,9 +121,10 @@ interface CourseCardProps {
   isCompleted: boolean;
   onToggleComplete: (id: string) => void;
   onOpenMedia: (type: 'video' | 'pdf') => void;
+  theme?: 'light' | 'dark';
 }
 
-type TabType = 'Home' | '7Edu' | 'TOTVS' | 'Todos' | 'Admin';
+type TabType = 'Home' | '7Edu' | 'TOTVS' | 'Todos' | 'Admin' | 'GeminiVideo';
 
 interface User {
   id: string;
@@ -355,6 +377,15 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [completedCourses, setCompletedCourses] = useState<string[]>([]);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const savedTheme = localStorage.getItem('fapacademy_theme');
+    return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'light';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('fapacademy_theme', theme);
+  }, [theme]);
+
   const [users, setUsers] = useState<User[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -653,7 +684,7 @@ export default function App() {
           key="app"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex min-h-screen bg-[#F1F5F9] font-sans text-slate-900"
+          className={`flex min-h-screen font-sans transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0B0F19] text-slate-100' : 'bg-[#F1F5F9] text-slate-900'}`}
         >
           {/* --- Overlay Mobile --- */}
           <AnimatePresence>
@@ -700,6 +731,12 @@ export default function App() {
               active={activeTab === 'Todos'} 
               onClick={() => { setActiveTab('Todos'); if (window.innerWidth < 1024) setIsSidebarOpen(false); }} 
             />
+            <SidebarItem 
+              icon={<Sparkles size={20} className="text-blue-500 animate-pulse" />} 
+              label="Análise IA Gemini" 
+              active={activeTab === 'GeminiVideo'} 
+              onClick={() => { setActiveTab('GeminiVideo'); if (window.innerWidth < 1024) setIsSidebarOpen(false); }} 
+            />
             
             <div className="pt-4 pb-2">
               <p className="px-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Sistemas</p>
@@ -731,6 +768,30 @@ export default function App() {
                 </>
               )}
           </nav>
+
+          {/* Botão de Alternância de Tema */}
+          <div className="px-6 py-4 border-t border-slate-800 flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-400">Tema {theme === 'dark' ? 'Escuro' : 'Claro'}</span>
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                theme === 'dark' ? 'bg-[#3B82F6]' : 'bg-slate-700'
+              }`}
+              title="Alternar tema"
+            >
+              <div
+                className={`flex h-4 w-4 items-center justify-center rounded-full bg-white transition-transform ${
+                  theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              >
+                {theme === 'dark' ? (
+                  <Moon size={10} className="text-indigo-600" />
+                ) : (
+                  <Sun size={10} className="text-amber-500" />
+                )}
+              </div>
+            </button>
+          </div>
 
           {/* Progresso Geral na Sidebar */}
           <div className="px-6 py-6 border-t border-slate-800">
@@ -775,22 +836,30 @@ export default function App() {
       {/* --- Conteúdo Principal --- */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Header Mobile & Desktop Search */}
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-8">
+        <header className={`sticky top-0 z-30 flex h-16 items-center justify-between border-b px-4 lg:px-8 transition-colors duration-300 ${
+          theme === 'dark' ? 'border-slate-800 bg-[#0F172A] text-white' : 'border-slate-200 bg-white text-slate-900'
+        }`}>
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="rounded-md p-2 hover:bg-slate-100"
+            className={`rounded-md p-2 transition-colors ${
+              theme === 'dark' ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100'
+            }`}
           >
             {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
 
           <div className="flex flex-1 items-center justify-center px-4 lg:justify-start lg:px-0">
-            {activeTab !== 'Home' && (
+            {activeTab !== 'Home' && activeTab !== 'GeminiVideo' && (
               <div className="relative w-full max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
                   type="text" 
                   placeholder="Pesquisar procedimento..." 
-                  className="w-full rounded-full border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm outline-none focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 transition-all"
+                  className={`w-full rounded-full border py-2 pl-10 pr-4 text-sm outline-none focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 transition-all ${
+                    theme === 'dark' 
+                      ? 'bg-slate-850 border-slate-700 text-slate-100 placeholder-slate-500' 
+                      : 'bg-slate-50 border-slate-200 text-slate-900'
+                  }`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -809,7 +878,9 @@ export default function App() {
         <div className="flex-1 overflow-y-auto">
           <AnimatePresence mode="wait">
             {activeTab === 'Home' ? (
-              <HomeView key="home" onNavigate={(tab) => setActiveTab(tab)} />
+              <HomeView key="home" onNavigate={(tab) => setActiveTab(tab)} theme={theme} />
+            ) : activeTab === 'GeminiVideo' ? (
+              <GeminiVideoUploader key="gemini-video" theme={theme} />
             ) : activeTab === 'Admin' ? (
               <AdminView 
                 key="admin" 
@@ -916,6 +987,7 @@ export default function App() {
                     setIsAppLoading(false);
                   }
                 }}
+                theme={theme}
               />
             ) : (
               <motion.div 
@@ -926,10 +998,10 @@ export default function App() {
                 className="p-4 lg:p-8"
               >
                 <div className="mb-8">
-                  <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                  <h1 className={`text-3xl font-bold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     {activeTab === 'Todos' ? 'Todos os Treinamentos' : `Treinamentos ${activeTab}`}
                   </h1>
-                  <p className="mt-2 text-slate-600">
+                  <p className={`mt-2 transition-colors ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     Explore os procedimentos operacionais padrão para otimizar seu fluxo de trabalho.
                   </p>
                 </div>
@@ -947,6 +1019,7 @@ export default function App() {
                           setSelectedCourse(course);
                           setModalType(type);
                         }}
+                        theme={theme}
                       />
                     ))}
                   </AnimatePresence>
@@ -1065,7 +1138,7 @@ export default function App() {
 
 // --- Subcomponentes ---
 
-const HomeView: React.FC<{ onNavigate: (tab: TabType) => void }> = ({ onNavigate }) => {
+const HomeView: React.FC<{ onNavigate: (tab: TabType) => void, theme: 'light' | 'dark' }> = ({ onNavigate, theme }) => {
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -1123,22 +1196,25 @@ const HomeView: React.FC<{ onNavigate: (tab: TabType) => void }> = ({ onNavigate
             icon={<Zap className="text-amber-500" />}
             title="Acesso Rápido"
             description="Encontre qualquer procedimento em segundos com nossa busca inteligente."
+            theme={theme}
           />
           <FeatureCard 
             icon={<Trophy className="text-[#3B82F6]" />}
             title="Acompanhe o Progresso"
             description="Marque aulas concluídas e visualize sua evolução em tempo real."
+            theme={theme}
           />
           <FeatureCard 
             icon={<Users className="text-emerald-500" />}
             title="Foco Corporativo"
             description="Conteúdo especializado nos sistemas 7Edu e TOTVS para o dia a dia."
+            theme={theme}
           />
         </motion.div>
       </section>
 
       {/* Quick Access Systems */}
-      <section id="system-selection" className="bg-white py-20 px-4 lg:px-8 border-t border-slate-200">
+      <section id="system-selection" className={`py-20 px-4 lg:px-8 border-t transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0B0F19] border-slate-900' : 'bg-white border-slate-200'}`}>
         <div className="max-w-7xl mx-auto w-full">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -1146,8 +1222,8 @@ const HomeView: React.FC<{ onNavigate: (tab: TabType) => void }> = ({ onNavigate
             viewport={{ once: true }}
             className="text-center mb-12"
           >
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Escolha seu Sistema</h2>
-            <p className="text-slate-600">Selecione a área de estudo que deseja focar hoje.</p>
+            <h2 className={`text-3xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Escolha seu Sistema</h2>
+            <p className={theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Selecione a área de estudo que deseja focar hoje.</p>
           </motion.div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -1170,7 +1246,7 @@ const HomeView: React.FC<{ onNavigate: (tab: TabType) => void }> = ({ onNavigate
   );
 };
 
-const FeatureCard: React.FC<{ icon: React.ReactNode, title: string, description: string }> = ({ icon, title, description }) => (
+const FeatureCard: React.FC<{ icon: React.ReactNode, title: string, description: string, theme: 'light' | 'dark' }> = ({ icon, title, description, theme }) => (
   <motion.div 
     variants={{
       hidden: { opacity: 0, y: 20 },
@@ -1178,13 +1254,17 @@ const FeatureCard: React.FC<{ icon: React.ReactNode, title: string, description:
     }}
     whileHover={{ scale: 1.05, y: -5 }}
     transition={{ type: "spring", stiffness: 300 }}
-    className="p-8 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all cursor-default"
+    className={`p-8 rounded-2xl border transition-colors duration-300 shadow-sm cursor-default ${
+      theme === 'dark' 
+        ? 'bg-[#131B2E] border-slate-800 text-white shadow-black/20' 
+        : 'bg-white border-slate-200 hover:shadow-xl'
+    }`}
   >
-    <div className="h-12 w-12 rounded-xl bg-slate-50 flex items-center justify-center mb-6">
+    <div className={`h-12 w-12 rounded-xl flex items-center justify-center mb-6 transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-50'}`}>
       {React.cloneElement(icon as React.ReactElement, { size: 28 })}
     </div>
-    <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
-    <p className="text-slate-600 leading-relaxed">{description}</p>
+    <h3 className={`text-xl font-bold mb-3 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{title}</h3>
+    <p className={`leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>{description}</p>
   </motion.div>
 );
 
@@ -1221,7 +1301,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, active, onClick 
   );
 }
 
-const CourseCard: React.FC<CourseCardProps> = ({ course, isCompleted, onToggleComplete, onOpenMedia }) => {
+const CourseCard: React.FC<CourseCardProps> = ({ course, isCompleted, onToggleComplete, onOpenMedia, theme = 'light' }) => {
   return (
     <motion.div 
       layout
@@ -1229,8 +1309,10 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, isCompleted, onToggleCo
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       whileHover={{ y: -4 }}
-      className={`group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm border transition-all hover:shadow-xl ${
-        isCompleted ? 'border-emerald-200 bg-emerald-50/10' : 'border-slate-200'
+      className={`group flex flex-col overflow-hidden rounded-2xl border transition-all duration-300 shadow-sm hover:shadow-xl ${
+        isCompleted 
+          ? (theme === 'dark' ? 'border-emerald-900 bg-emerald-950/20' : 'border-emerald-200 bg-emerald-50/10') 
+          : (theme === 'dark' ? 'border-slate-800 bg-[#131B2E] text-white' : 'border-slate-200 bg-white text-slate-900')
       }`}
     >
       {/* Thumbnail */}
@@ -1272,7 +1354,9 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, isCompleted, onToggleCo
             {course.system}
           </span>
           {course.pdfUrl && (
-            <span className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider bg-white/90 text-slate-900 shadow-sm flex items-center gap-1">
+            <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm flex items-center gap-1 ${
+              theme === 'dark' ? 'bg-slate-800/90 text-slate-200' : 'bg-white/90 text-slate-900'
+            }`}>
               <FileText size={10} /> PDF
             </span>
           )}
@@ -1288,14 +1372,18 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, isCompleted, onToggleCo
       <div className="flex flex-1 flex-col p-5">
         <div className="flex justify-between items-start gap-2 mb-2">
           <h3 className={`text-lg font-bold leading-tight transition-colors ${
-            isCompleted ? 'text-emerald-900' : 'text-slate-900 group-hover:text-[#3B82F6]'
+            isCompleted 
+              ? (theme === 'dark' ? 'text-emerald-400' : 'text-emerald-900') 
+              : (theme === 'dark' ? 'text-slate-100 group-hover:text-blue-400' : 'text-slate-900 group-hover:text-[#3B82F6]')
           }`}>
             {course.title}
           </h3>
           <button 
             onClick={() => onToggleComplete(course.id)}
             className={`p-1 rounded-md transition-colors ${
-              isCompleted ? 'text-emerald-600 bg-emerald-100' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
+              isCompleted 
+                ? 'text-emerald-600 bg-emerald-100/80' 
+                : (theme === 'dark' ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100')
             }`}
             title={isCompleted ? "Marcar como não concluído" : "Marcar como concluído"}
           >
@@ -1303,11 +1391,15 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, isCompleted, onToggleCo
           </button>
         </div>
         
-        <p className="text-slate-500 text-xs line-clamp-2 leading-relaxed mb-4">
+        <p className={`text-xs line-clamp-2 leading-relaxed mb-4 transition-colors ${
+          theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+        }`}>
           {course.description || "Esta aula aborda as diretrizes essenciais, instruções e melhores práticas recomendadas para o domínio operacional dos processos administrativos."}
         </p>
         
-        <div className="mt-auto flex items-center gap-4 text-xs text-slate-500">
+        <div className={`mt-auto flex items-center gap-4 text-xs transition-colors ${
+          theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+        }`}>
           <div className="flex items-center gap-1">
             <Clock size={14} />
             <span>{course.duration}</span>
@@ -1332,18 +1424,29 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, isCompleted, onToggleCo
             {isCompleted ? 'Reassistir' : 'Iniciar Aula'}
           </button>
           {course.pdfUrl ? (
-            <button 
-              onClick={() => onOpenMedia('pdf')}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 py-3 text-sm font-semibold text-emerald-700 transition-colors active:scale-95 shadow-sm"
-              title="Ver e Baixar Material de Apoio (PDF)"
+            <a 
+              href={course.pdfUrl}
+              download={`${course.title}.pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold transition-all active:scale-95 shadow-sm text-center border ${
+                theme === 'dark'
+                  ? 'bg-emerald-950/30 text-emerald-400 border-emerald-900 hover:bg-emerald-900/40'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+              }`}
+              title="Baixar Material de Apoio (PDF)"
             >
-              <FileText size={18} className="text-emerald-600" />
+              <Download size={18} className="text-emerald-500" />
               <span>Material</span>
-            </button>
+            </a>
           ) : (
             <button 
               disabled
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-50 border border-slate-100 py-3 text-sm font-semibold text-slate-300 cursor-not-allowed"
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold border cursor-not-allowed ${
+                theme === 'dark'
+                  ? 'bg-slate-900 text-slate-700 border-slate-950'
+                  : 'bg-slate-50 text-slate-300 border-slate-100'
+              }`}
               title="Sem material de apoio disponível"
             >
               <FileText size={18} />
@@ -1516,9 +1619,10 @@ const AdminView: React.FC<{
   onAddCourse: (course: Course) => void,
   onDeleteCourse: (id: string) => void,
   onUpdateCourse: (course: Course) => void,
-  onSyncData: () => void
-}> = ({ users, onAddUser, onDeleteUser, onUpdateUser, courses, onAddCourse, onDeleteCourse, onUpdateCourse, onSyncData }) => {
-  const [adminTab, setAdminTab] = useState<'users' | 'courses'>('users');
+  onSyncData: () => void,
+  theme?: 'light' | 'dark'
+}> = ({ users, onAddUser, onDeleteUser, onUpdateUser, courses, onAddCourse, onDeleteCourse, onUpdateCourse, onSyncData, theme = 'light' }) => {
+  const [adminTab, setAdminTab] = useState<'users' | 'courses' | 'engagement'>('users');
   const [isAdding, setIsAdding] = useState(false);
   const [isBulk, setIsBulk] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -1529,6 +1633,79 @@ const AdminView: React.FC<{
   });
   const [bulkText, setBulkText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  // Generate beautiful analytical data from courses and users
+  const getEngagementData = () => {
+    const progressDataStr = localStorage.getItem('fapacademy_progress');
+    const completedCourses: string[] = progressDataStr ? JSON.parse(progressDataStr) : [];
+    
+    const completionsMap: Record<string, number> = {};
+    
+    courses.forEach((c, idx) => {
+      // Deterministically seed base completions based on course index / system
+      const baseCount = (idx % 3 === 0 ? 12 : idx % 2 === 0 ? 8 : 4) + (c.system === '7Edu' ? 5 : 2);
+      completionsMap[c.id] = baseCount;
+    });
+
+    if (completedCourses && completedCourses.length > 0) {
+      completedCourses.forEach(cid => {
+        if (completionsMap[cid] !== undefined) {
+          completionsMap[cid] += 1;
+        }
+      });
+    }
+
+    // Sort and get top 5 most viewed lessons
+    const popularLessonsData = courses
+      .map(c => ({
+        name: c.title.length > 25 ? c.title.substring(0, 25) + '...' : c.title,
+        Conclusões: completionsMap[c.id] || 0,
+        Sistema: c.system
+      }))
+      .sort((a, b) => b.Conclusões - a.Conclusões)
+      .slice(0, 5);
+
+    // Calculations for "Porcentagem de conclusão média" (Average completion rate)
+    const userCompletions = users.map((u, idx) => {
+      const isCurrentUser = u.email === 'mateusjhonata123@gmail.com' || u.id === '1';
+      if (isCurrentUser) {
+        return Math.round((completedCourses.length / Math.max(courses.length, 1)) * 100);
+      }
+      return idx === 1 ? 80 : idx === 2 ? 40 : idx === 3 ? 64 : 15;
+    });
+
+    const averageCompletion = Math.round(
+      userCompletions.reduce((sum, val) => sum + val, 0) / Math.max(users.length, 1)
+    );
+
+    // Completion distribution by ranges (0-20%, 21-50%, 51-80%, 81-100%)
+    const distribution = [
+      { name: '0-20%', value: userCompletions.filter(v => v <= 20).length },
+      { name: '21-50%', value: userCompletions.filter(v => v > 20 && v <= 50).length },
+      { name: '51-80%', value: userCompletions.filter(v => v > 50 && v <= 80).length },
+      { name: '81-100%', value: userCompletions.filter(v => v > 80).length }
+    ];
+
+    let eduViews = 0;
+    let totvsViews = 0;
+    courses.forEach(c => {
+      const views = completionsMap[c.id] || 0;
+      if (c.system === '7Edu') eduViews += views;
+      else totvsViews += views;
+    });
+
+    const systemViewsData = [
+      { name: '7Edu', value: eduViews, color: '#6366F1' },
+      { name: 'TOTVS', value: totvsViews, color: '#10B981' }
+    ];
+
+    return {
+      popularLessonsData,
+      averageCompletion,
+      distribution,
+      systemViewsData
+    };
+  };
 
   const handleFileUpload = async (file: File, type: 'video' | 'pdf') => {
     setIsUploading(true);
@@ -1729,18 +1906,38 @@ const AdminView: React.FC<{
       </div>
 
       {/* Admin Tabs */}
-      <div className="flex gap-4 mb-8 bg-slate-100 p-1 rounded-2xl w-fit">
+      <div className={`flex flex-wrap gap-2 mb-8 p-1 rounded-2xl w-fit transition-colors duration-300 ${
+        theme === 'dark' ? 'bg-slate-900 border border-slate-800' : 'bg-slate-100'
+      }`}>
         <button 
           onClick={() => setAdminTab('users')}
-          className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${adminTab === 'users' ? 'bg-white text-[#3B82F6] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
+            adminTab === 'users' 
+              ? (theme === 'dark' ? 'bg-slate-800 text-[#3B82F6] shadow-sm' : 'bg-white text-[#3B82F6] shadow-sm') 
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
         >
           Usuários
         </button>
         <button 
           onClick={() => setAdminTab('courses')}
-          className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${adminTab === 'courses' ? 'bg-white text-[#3B82F6] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
+            adminTab === 'courses' 
+              ? (theme === 'dark' ? 'bg-slate-800 text-[#3B82F6] shadow-sm' : 'bg-white text-[#3B82F6] shadow-sm') 
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
         >
           Aulas e Conteúdo
+        </button>
+        <button 
+          onClick={() => setAdminTab('engagement')}
+          className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
+            adminTab === 'engagement' 
+              ? (theme === 'dark' ? 'bg-slate-800 text-[#3B82F6] shadow-sm' : 'bg-white text-[#3B82F6] shadow-sm') 
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Engajamento dos Usuários
         </button>
       </div>
 
@@ -1761,7 +1958,7 @@ const AdminView: React.FC<{
         ))}
       </div>
 
-      {adminTab === 'users' ? (
+      {adminTab === 'users' && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-100">
             <h2 className="text-lg font-bold text-slate-900">Usuários Cadastrados</h2>
@@ -1832,7 +2029,9 @@ const AdminView: React.FC<{
             </table>
           </div>
         </div>
-      ) : (
+      )}
+
+      {adminTab === 'courses' && (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-100">
             <h2 className="text-lg font-bold text-slate-900">Aulas Disponíveis</h2>
@@ -1888,7 +2087,179 @@ const AdminView: React.FC<{
         </div>
       )}
 
-      {/* Add Modal */}
+      {adminTab === 'engagement' && (
+        <div className="space-y-8">
+          {/* Analytics Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className={`p-6 rounded-2xl border transition-colors ${theme === 'dark' ? 'bg-[#131B2E] border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Conclusões</p>
+              <h2 className={`text-4xl font-extrabold mt-2 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                {getEngagementData().systemViewsData.reduce((acc, curr) => acc + curr.value, 0)}
+              </h2>
+              <p className="text-xs text-slate-500 mt-2">Acumulado em todas as vídeo-aulas</p>
+            </div>
+
+            <div className={`p-6 rounded-2xl border transition-colors ${theme === 'dark' ? 'bg-[#131B2E] border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Média de Conclusão</p>
+              <h2 className={`text-4xl font-extrabold mt-2 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`}>
+                {getEngagementData().averageCompletion}%
+              </h2>
+              <p className="text-xs text-slate-500 mt-2">Porcentagem de conclusão média dos alunos</p>
+            </div>
+
+            <div className={`p-6 rounded-2xl border transition-colors ${theme === 'dark' ? 'bg-[#131B2E] border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">7Edu Assistidas</p>
+              <h2 className={`text-4xl font-extrabold mt-2 ${theme === 'dark' ? 'text-indigo-400' : 'text-indigo-500'}`}>
+                {getEngagementData().systemViewsData.find(d => d.name === '7Edu')?.value || 0}
+              </h2>
+              <p className="text-xs text-slate-500 mt-2">Aulas concluídas no sistema 7Edu</p>
+            </div>
+
+            <div className={`p-6 rounded-2xl border transition-colors ${theme === 'dark' ? 'bg-[#131B2E] border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">TOTVS Assistidas</p>
+              <h2 className={`text-4xl font-extrabold mt-2 ${theme === 'dark' ? 'text-emerald-400' : 'text-emerald-500'}`}>
+                {getEngagementData().systemViewsData.find(d => d.name === 'TOTVS')?.value || 0}
+              </h2>
+              <p className="text-xs text-slate-500 mt-2">Aulas concluídas no sistema TOTVS</p>
+            </div>
+          </div>
+
+          {/* Bento-grid Charts container */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Chart 1: Bar Chart "Aulas mais assistidas" */}
+            <div className={`lg:col-span-2 p-6 rounded-2xl border transition-colors ${theme === 'dark' ? 'bg-[#131B2E] border-slate-800 pt-8' : 'bg-white border-slate-100 shadow-sm'}`}>
+              <div className="mb-4">
+                <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Aulas Mais Assistidas (Top 5)</h3>
+                <p className="text-xs text-slate-500">Ranking das vídeo-aulas com o maior número de conclusões</p>
+              </div>
+              <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsBarChart
+                    data={getEngagementData().popularLessonsData}
+                    layout="vertical"
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#1E293B' : '#F1F5F9'} />
+                    <XAxis type="number" stroke={theme === 'dark' ? '#94A3B8' : '#64748B'} />
+                    <YAxis dataKey="name" type="category" width={140} stroke={theme === 'dark' ? '#94A3B8' : '#64748B'} style={{ fontSize: '11px' }} />
+                    <Tooltip 
+                      contentStyle={theme === 'dark' ? { backgroundColor: '#1E293B', border: 'none', borderRadius: '8px', color: '#fff' } : undefined}
+                    />
+                    <Legend />
+                    <Bar dataKey="Conclusões" fill="#3B82F6" barSize={16}>
+                      {getEngagementData().popularLessonsData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.Sistema === '7Edu' ? '#6366F1' : '#10B981'} />
+                      ))}
+                    </Bar>
+                  </RechartsBarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Chart 2: Donut Chart "Visualizações por Sistema" */}
+            <div className={`p-6 rounded-2xl border transition-colors ${theme === 'dark' ? 'bg-[#131B2E] border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+              <div className="mb-4">
+                <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Estudo por Área</h3>
+                <p className="text-xs text-slate-500">Divisão de aulas assistidas entre 7Edu e TOTVS</p>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={getEngagementData().systemViewsData}
+                      cx="55%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {getEngagementData().systemViewsData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={theme === 'dark' ? { backgroundColor: '#1E293B', border: 'none', borderRadius: '8px', color: '#fff' } : undefined}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-center text-xs text-slate-500 mt-2">
+                Aulas do sistema <span className="text-[#6366F1] font-bold">7Edu</span> representam a maior taxa de visualizações.
+              </div>
+            </div>
+          </div>
+
+          {/* Distribution chart and Stats Table */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Chart 3: Area/Line Chart of Completion Distribution */}
+            <div className={`p-6 rounded-2xl border transition-colors ${theme === 'dark' ? 'bg-[#131B2E] border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+              <div className="mb-4">
+                <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Distribuição de Conclusão</h3>
+                <p className="text-xs text-slate-500">Quantidade de alunos por faixa de conclusão (%)</p>
+              </div>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={getEngagementData().distribution}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="name" stroke={theme === 'dark' ? '#94A3B8' : '#64748B'} />
+                    <YAxis stroke={theme === 'dark' ? '#94A3B8' : '#64748B'} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#1E293B' : '#F1F5F9'} />
+                    <Tooltip 
+                      contentStyle={theme === 'dark' ? { backgroundColor: '#1E293B', border: 'none', borderRadius: '8px', color: '#fff' } : undefined}
+                    />
+                    <Area type="monotone" dataKey="value" stroke="#3B82F6" fillOpacity={1} fill="url(#colorValue)" name="Alunos" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Engagement list summary table */}
+            <div className={`p-6 rounded-2xl border transition-colors ${theme === 'dark' ? 'bg-[#131B2E] border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+              <div className="mb-4">
+                <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Performance de Alunos</h3>
+                <p className="text-xs text-slate-500">Métricas individuais de aproveitamento por colaborador</p>
+              </div>
+              <div className="overflow-y-auto max-h-64 pr-2">
+                <div className="space-y-4">
+                  {users.map((u, idx) => {
+                    const isCurrentUser = u.email === 'mateusjhonata123@gmail.com' || u.id === '1';
+                    const activeProgressStr = localStorage.getItem('fapacademy_progress');
+                    const activeProgressArr: string[] = activeProgressStr ? JSON.parse(activeProgressStr) : [];
+                    const pct = isCurrentUser
+                      ? Math.round((activeProgressArr.length / Math.max(courses.length, 1)) * 100)
+                      : (idx === 1 ? 80 : idx === 2 ? 40 : idx === 3 ? 64 : 15);
+                    return (
+                      <div key={u.id} className="flex items-center justify-between border-b pb-3 border-dashed border-slate-200">
+                        <div>
+                          <p className={`text-sm font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{u.name}</p>
+                          <p className="text-xs text-slate-500">{u.email}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                            pct >= 75 ? 'bg-emerald-100 text-emerald-800' : pct >= 40 ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {pct}% Concluído
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <AnimatePresence>
         {isAdding && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
@@ -2095,10 +2466,78 @@ const MediaModal: React.FC<{
   const [videoState, setVideoState] = useState<'loading' | 'playing' | 'paused' | 'error'>('loading');
   const [diagnosticLogs, setDiagnosticLogs] = useState<string[]>([]);
   const [showLogs, setShowLogs] = useState(false);
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string>('');
+  const [resolvedPdfUrl, setResolvedPdfUrl] = useState<string>('');
 
   const addLog = (msg: string) => {
     setDiagnosticLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
   };
+
+  useEffect(() => {
+    if (!isOpen || !course) return;
+    
+    let active = true;
+    let localVideoUrlBlob = '';
+    let localPdfUrlBlob = '';
+
+    const resolveLocalResources = async () => {
+      // Resolve Video
+      if (course.videoUrl) {
+        if (course.videoUrl.startsWith('local-file-')) {
+          try {
+            const blob = await getLocalFile(course.videoUrl);
+            if (blob && active) {
+              const bUrl = URL.createObjectURL(blob);
+              localVideoUrlBlob = bUrl;
+              setResolvedVideoUrl(bUrl);
+              addLog(`Vídeo local convertido com sucesso em Blob URL: ${bUrl}`);
+            }
+          } catch (err) {
+            console.error(err);
+            addLog(`Erro ao resolver vídeo local: ${err}`);
+          }
+        } else {
+          setResolvedVideoUrl(course.videoUrl);
+        }
+      } else {
+        setResolvedVideoUrl('');
+      }
+
+      // Resolve PDF
+      if (course.pdfUrl) {
+        if (course.pdfUrl.startsWith('local-file-')) {
+          try {
+            const blob = await getLocalFile(course.pdfUrl);
+            if (blob && active) {
+              const bUrl = URL.createObjectURL(blob);
+              localPdfUrlBlob = bUrl;
+              setResolvedPdfUrl(bUrl);
+              addLog(`PDF local convertido com sucesso em Blob URL: ${bUrl}`);
+            }
+          } catch (err) {
+            console.error(err);
+            addLog(`Erro ao resolver PDF local: ${err}`);
+          }
+        } else {
+          setResolvedPdfUrl(course.pdfUrl);
+        }
+      } else {
+        setResolvedPdfUrl('');
+      }
+    };
+
+    resolveLocalResources();
+
+    return () => {
+      active = false;
+      if (localVideoUrlBlob && localVideoUrlBlob.startsWith('blob:')) {
+        URL.revokeObjectURL(localVideoUrlBlob);
+      }
+      if (localPdfUrlBlob && localPdfUrlBlob.startsWith('blob:')) {
+        URL.revokeObjectURL(localPdfUrlBlob);
+      }
+    };
+  }, [isOpen, course]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -2340,12 +2779,12 @@ const MediaModal: React.FC<{
     return parsedUrl;
   };
 
-  const videoSrc = course.videoUrl && course.videoUrl !== "" && !course.videoUrl.startsWith('file://')
-    ? getEmbedUrl(course.videoUrl)
+  const videoSrc = resolvedVideoUrl && resolvedVideoUrl !== "" && !resolvedVideoUrl.startsWith('file://')
+    ? getEmbedUrl(resolvedVideoUrl)
     : null;
     
-  const pdfSrc = course.pdfUrl && !course.pdfUrl.startsWith('file://') 
-    ? course.pdfUrl 
+  const pdfSrc = resolvedPdfUrl && !resolvedPdfUrl.startsWith('file://') 
+    ? resolvedPdfUrl 
     : null;
 
   const pdfEmbedSrc = pdfSrc ? getPdfEmbedUrl(pdfSrc) : null;

@@ -160,6 +160,96 @@ ${coursesContext}`;
   }
 });
 
+// Endpoint para gerar a URL de upload segura diretamente com o servidor do Google
+app.post("/api/gemini/upload-url", async (req, res) => {
+  try {
+    const { filename, mimeType, size } = req.body;
+
+    if (!filename || !mimeType || !size) {
+      return res.status(400).json({ error: "Os parâmetros 'filename', 'mimeType' e 'size' são obrigatórios." });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "A chave de API GEMINI_API_KEY não está configurada no servidor." });
+    }
+
+    // Inicia a sessão de upload resumível (resumable upload) na API de Arquivos do Gemini
+    const googleUploadEndpoint = `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`;
+    
+    const response = await fetch(googleUploadEndpoint, {
+      method: "POST",
+      headers: {
+        "X-Goog-Upload-Protocol": "resumable",
+        "X-Goog-Upload-Command": "start",
+        "X-Goog-Upload-Header-Content-Length": size.toString(),
+        "X-Goog-Upload-Header-Content-Type": mimeType,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        file: {
+          displayName: filename,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        error: `Falha ao iniciar sessão de uploader no Google: ${errorText}`,
+      });
+    }
+
+    // O cabeçalho 'x-goog-upload-url' contém a URL segura para o envio direto do arquivo (exclusivo Nuvem-para-Nuvem)
+    const uploadUrl = response.headers.get("x-goog-upload-url");
+    if (!uploadUrl) {
+      return res.status(500).json({
+        error: "Resposta do Google não forneceu a URL de upload segura nos cabeçalhos (x-goog-upload-url).",
+      });
+    }
+
+    return res.json({ uploadUrl });
+  } catch (error: any) {
+    console.error("Erro ao gerar URL de upload seguro:", error);
+    return res.status(500).json({ error: error.message || "Erro interno ao processar URL de upload." });
+  }
+});
+
+// Endpoint para analisar o vídeo após o upload direto finalizar
+app.post("/api/gemini/analyze", async (req, res) => {
+  try {
+    const { fileUri, mimeType, prompt } = req.body;
+
+    if (!fileUri || !mimeType) {
+      return res.status(400).json({ error: "Os parâmetros 'fileUri' e 'mimeType' são obrigatórios para a análise." });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "A chave de API GEMINI_API_KEY não está configurada no servidor." });
+    }
+
+    // Passa o arquivo já hospedado nos servidores do Google (fileUri) direto para o Gemini sem tráfego redundante na Vercel
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: [
+        {
+          fileData: {
+            fileUri,
+            mimeType,
+          },
+        },
+        prompt || "Por favor, faça uma análise minuciosa das etapas operacionais exibidas neste treinamento, destacando pontos críticos e de melhoria.",
+      ],
+    });
+
+    return res.json({ text: response.text || "Nenhuma resposta textual foi gerada." });
+  } catch (error: any) {
+    console.error("Erro na análise do vídeo com Gemini:", error);
+    return res.status(500).json({ error: error.message || "Erro interno do servidor ao analisar vídeo." });
+  }
+});
+
 // Vite Setup for Development / Static Setup for Production
 const startServer = async () => {
   if (process.env.NODE_ENV !== "production") {
