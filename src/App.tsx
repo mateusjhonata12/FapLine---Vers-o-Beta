@@ -1071,37 +1071,44 @@ export default function App() {
         </div>
 
         {/* Modal de Mídia */}
-        <MediaModal 
-          isOpen={!!modalType} 
-          type={modalType} 
-          course={selectedCourse} 
-          courses={courses}
-          onSelectCourse={(c) => {
-            setSelectedCourse(c);
-          }}
-          isCompleted={selectedCourse ? completedCourses.includes(selectedCourse.id) : false}
-          onToggleComplete={toggleComplete}
-          onClose={() => {
-            setModalType(null);
-            setSelectedCourse(null);
-          }} 
-          onPrev={(() => {
-            if (!selectedCourse) return undefined;
-            const currentIndex = filteredCourses.findIndex(c => c.id === selectedCourse.id);
-            if (currentIndex > 0) {
-              return () => setSelectedCourse(filteredCourses[currentIndex - 1]);
-            }
-            return undefined;
-          })()}
-          onNext={(() => {
-            if (!selectedCourse) return undefined;
-            const currentIndex = filteredCourses.findIndex(c => c.id === selectedCourse.id);
-            if (currentIndex !== -1 && currentIndex < filteredCourses.length - 1) {
-              return () => setSelectedCourse(filteredCourses[currentIndex + 1]);
-            }
-            return undefined;
-          })()}
-        />
+        {(() => {
+          const liveSelectedCourse = selectedCourse 
+            ? (courses.find(c => c.id === selectedCourse.id) || selectedCourse)
+            : null;
+          return (
+            <MediaModal 
+              isOpen={!!modalType} 
+              type={modalType} 
+              course={liveSelectedCourse} 
+              courses={courses}
+              onSelectCourse={(c) => {
+                setSelectedCourse(c);
+              }}
+              isCompleted={liveSelectedCourse ? completedCourses.includes(liveSelectedCourse.id) : false}
+              onToggleComplete={toggleComplete}
+              onClose={() => {
+                setModalType(null);
+                setSelectedCourse(null);
+              }} 
+              onPrev={(() => {
+                if (!liveSelectedCourse) return undefined;
+                const currentIndex = filteredCourses.findIndex(c => c.id === liveSelectedCourse.id);
+                if (currentIndex > 0) {
+                  return () => setSelectedCourse(filteredCourses[currentIndex - 1]);
+                }
+                return undefined;
+              })()}
+              onNext={(() => {
+                if (!liveSelectedCourse) return undefined;
+                const currentIndex = filteredCourses.findIndex(c => c.id === liveSelectedCourse.id);
+                if (currentIndex !== -1 && currentIndex < filteredCourses.length - 1) {
+                  return () => setSelectedCourse(filteredCourses[currentIndex + 1]);
+                }
+                return undefined;
+              })()}
+            />
+          );
+        })()}
 
         {/* Achievement Toast */}
         <AnimatePresence>
